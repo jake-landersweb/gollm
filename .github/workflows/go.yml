@@ -14,9 +14,9 @@ jobs:
     environment: base
     runs-on: ubuntu-latest
     env: 
-      super_secret: ${{ secrets.OPENAI_API_KEY }}
-      super_secret: ${{ secrets.GEMINI_API_KEY }}
-      super_secret: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
     - uses: actions/checkout@v4
 
