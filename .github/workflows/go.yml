@@ -13,6 +13,10 @@ jobs:
   build:
     environment: base
     runs-on: ubuntu-latest
+    env: 
+      super_secret: ${{ secrets.OPENAI_API_KEY }}
+      super_secret: ${{ secrets.GEMINI_API_KEY }}
+      super_secret: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
     - uses: actions/checkout@v4
 
@@ -22,11 +26,6 @@ jobs:
         go-version: '1.22'
 
     - name: Go Test
-        with:
-          env: 
-            super_secret: ${{ secrets.OPENAI_API_KEY }}
-            super_secret: ${{ secrets.GEMINI_API_KEY }}
-            super_secret: ${{ secrets.ANTHROPIC_API_KEY }}
         run: go test ./... -json > TestResults-${{ matrix.go-version }}.json
 
     - name: Upload Go Test Results
