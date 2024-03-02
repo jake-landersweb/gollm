@@ -73,3 +73,37 @@ assert.Equal(t, 7, len(model.conversation))
 ```
 
 In this example, first the conversation is started with `Gemini`. Then, the conversation is extended with `GPT 3.5`. Lastly, the conversation is finished with `Claude 2.1`. 
+
+## Resources
+
+### OpenAI
+
+- [API error codes](https://platform.openai.com/docs/guides/error-codes/api-errors)
+- [API error codes code](https://community.openai.com/t/openai-chat-list-of-error-codes-and-types/357791/11)
+- [Tokens](https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them)
+- [Estimating tokens](https://community.openai.com/t/what-is-the-openai-algorithm-to-calculate-tokens/58237/28)
+- [API docs](https://platform.openai.com/docs/api-reference/audio/verbose-json-object)
+
+### Gemini
+
+- [Getting number of tokens](https://cloud.google.com/vertex-ai/generative-ai/docs/multimodal/get-token-count)
+- [Model REST API docs](https://ai.google.dev/api/rest/v1beta/models)
+- [REST API Quickstart](https://ai.google.dev/tutorials/rest_quickstart)
+- [gRPC errors](https://google.aip.dev/193)
+- [gRPC error codes](https://github.com/grpc/grpc/blob/master/doc/statuscodes.md)
+- [Generate content API docs](https://ai.google.dev/api/rest/v1beta/models/generateContent)
+- [Available endpoints](https://ai.google.dev/api/rest)
+- 
+
+### Anthropic
+
+- [Glossary](https://docs.anthropic.com/claude/docs/glossary)
+- [Avoiding hallucinations](https://docs.anthropic.com/claude/docs/let-claude-say-i-dont-know)
+- [Prompting tips](https://docs.anthropic.com/claude/docs/configuring-gpt-prompts-for-claude)
+
+### Other
+
+- [Go tokenizer](https://github.com/sugarme/tokenizer)
+- [Go tokenizer 2](https://github.com/tiktoken-go/tokenizer)
+- [TikToken in Go](https://github.com/pkoukk/tiktoken-go)
+- 
