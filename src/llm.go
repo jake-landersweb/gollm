@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
+	"github.com/jake-landersweb/gollm/src/tokens"
 )
 
 type LLM struct {
@@ -11,7 +13,7 @@ type LLM struct {
 	logger *slog.Logger
 
 	conversation []*LLMMessage
-	tokenRecords []*TokenRecord
+	tokenRecords []*tokens.TokenRecord
 }
 
 type CompletionInput struct {
@@ -31,7 +33,7 @@ func NewLLM(userId string, logger *slog.Logger, sysMsg string) *LLM {
 		userId:       userId,
 		logger:       logger,
 		conversation: conversation,
-		tokenRecords: make([]*TokenRecord, 0),
+		tokenRecords: make([]*tokens.TokenRecord, 0),
 	}
 }
 
@@ -91,7 +93,7 @@ func (l *LLM) GPTCompletion(ctx context.Context, input *CompletionInput) (string
 	l.conversation = append(l.conversation, NewMessageFromGPT(&response.Choices[0].Message))
 
 	// add the tokens to the internal counts
-	l.tokenRecords = append(l.tokenRecords, NewTokenRecordFromGPTUsage(input.Model, &response.Usage))
+	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecordFromGPTUsage(input.Model, &response.Usage))
 
 	logger.InfoContext(ctx, "Completed GPT completion")
 	logger.DebugContext(ctx, "GPT completion stats", "response", response, "inTokens", response.Usage.PromptTokens, "outTokens", response.Usage.CompletionTokens, "totalTokens", response.Usage.TotalTokens)
@@ -135,12 +137,7 @@ func (l *LLM) GeminiCompletion(ctx context.Context, input *CompletionInput) (str
 	l.conversation = append(l.conversation, NewMessageFromGemini(&response.Candidates[0].Content))
 
 	// add the parsed tokens
-	l.tokenRecords = append(l.tokenRecords, &TokenRecord{
-		Model:        input.Model,
-		InputTokens:  inTokens,
-		OutputTokens: outTokens,
-		TotalTokens:  inTokens + outTokens,
-	})
+	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecord(input.Model, inTokens, outTokens, inTokens+outTokens))
 
 	logger.InfoContext(ctx, "Completed Gemini completion")
 	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
@@ -171,7 +168,7 @@ func (l *LLM) AnthropicCompletion(ctx context.Context, input *CompletionInput) (
 	l.conversation = append(l.conversation, NewMessageFromAnthropic(response.Content[0]))
 
 	// add the tokens to the internal counts
-	l.tokenRecords = append(l.tokenRecords, NewTokenRecordFromAnthropicUsage(input.Model, response.Usage))
+	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecordFromAnthropicUsage(input.Model, response.Usage))
 
 	logger.InfoContext(ctx, "Completed GPT completion")
 	logger.DebugContext(ctx, "GPT completion stats", "response", response, "inTokens", response.Usage.InputTokens, "outTokens", response.Usage.OutputTokens, "totalTokens", response.Usage.InputTokens+response.Usage.OutputTokens)
