@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jake-landersweb/gollm/src/ltypes"
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
 func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, userId string, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GPTCompletionMessage) (*ltypes.GPTCompletionResponse, error) {

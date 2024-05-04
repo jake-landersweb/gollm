@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/jake-landersweb/gollm/src/ltypes"
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 	"github.com/stretchr/testify/assert"
 )
 

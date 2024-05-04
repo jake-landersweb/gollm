@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/jake-landersweb/gollm/src/tokens"
+	"github.com/jake-landersweb/gollm/v2/src/tokens"
 )
 
 type LanguageModel struct {

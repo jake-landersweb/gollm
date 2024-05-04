@@ -1,4 +1,4 @@
-module github.com/jake-landersweb/gollm
+module github.com/jake-landersweb/gollm/v2
 
 go 1.22.0
 
