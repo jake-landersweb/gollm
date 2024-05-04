@@ -15,7 +15,7 @@ import (
 	"github.com/jake-landersweb/gollm/src/ltypes"
 )
 
-func anthropicCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.AnthropicMessage) (*ltypes.AnthropicResponse, error) {
+func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.AnthropicMessage) (*ltypes.AnthropicResponse, error) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 
 	if apiKey == "" || apiKey == "null" {
@@ -37,7 +37,7 @@ func anthropicCompletion(ctx context.Context, logger *slog.Logger, model string,
 		Model:       model,
 		Messages:    msgs,
 		System:      systemMsg,
-		MaxTokens:   ANTHROPIC_MAX_TOKENS,
+		MaxTokens:   l.args.AnthropicMaxTokens,
 		Temperature: temperature,
 	}
 
@@ -62,13 +62,13 @@ func anthropicCompletion(ctx context.Context, logger *slog.Logger, model string,
 	}
 
 	// create the request
-	req, err := http.NewRequest("POST", ANTHROPIC_BASE_URL, bytes.NewBuffer(enc))
+	req, err := http.NewRequest("POST", l.args.AnthropicBaseUrl, bytes.NewBuffer(enc))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("anthropic-version", ANTHROPIC_VERSION)
+	req.Header.Set("anthropic-version", l.args.AnthropicVersion)
 
 	retries := 3
 	backoff := 1 * time.Second

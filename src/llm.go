@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/jake-landersweb/gollm/src/tokens"
 )
@@ -11,8 +12,9 @@ import (
 type LanguageModel struct {
 	userId string
 	logger *slog.Logger
+	args   *NewLanguageModelArgs
 
-	conversation []*LLMMessage
+	conversation []*LanguageModelMessage
 	tokenRecords []*tokens.TokenRecord
 }
 
@@ -24,14 +26,58 @@ type CompletionInput struct {
 	Input       string
 }
 
-func NewLanguageModel(userId string, logger *slog.Logger, sysMsg string) *LanguageModel {
+type NewLanguageModelArgs struct {
+	SystemMessage string
+
+	// OpenAI Configs
+	GptBaseUrl   string
+	GptMaxTokens int
+
+	// Gemini Configs
+	GeminiBaseUrl string
+	// GeminiSystemMessageTemplate string
+
+	// Anthropic Configs
+	AnthropicBaseUrl   string
+	AnthropicVersion   string
+	AnthropicMaxTokens int
+}
+
+func NewLanguageModel(userId string, logger *slog.Logger, args *NewLanguageModelArgs) *LanguageModel {
+	// parse the arguments
+	if args == nil {
+		args = &NewLanguageModelArgs{SystemMessage: default_system_message}
+	}
+	if args.GptBaseUrl == "" {
+		args.GptBaseUrl = gpt_base_url
+	}
+	if args.GptMaxTokens == 0 {
+		args.GptMaxTokens = gpt_max_tokens
+	}
+	if args.GeminiBaseUrl == "" {
+		args.GeminiBaseUrl = gemini_base_url
+	}
+	// if args.GeminiSystemMessageTemplate == "" {
+	// 	args.GeminiSystemMessageTemplate = gemini_system_message
+	// }
+	if args.AnthropicBaseUrl == "" {
+		args.AnthropicBaseUrl = anthropic_base_url
+	}
+	if args.AnthropicVersion == "" {
+		args.AnthropicVersion = anthropic_version
+	}
+	if args.AnthropicMaxTokens == 0 {
+		args.AnthropicMaxTokens = anthropic_max_tokens
+	}
+
 	// initialize the conversation
-	conversation := make([]*LLMMessage, 0)
-	conversation = append(conversation, NewSystemMessage(sysMsg))
+	conversation := make([]*LanguageModelMessage, 0)
+	conversation = append(conversation, NewSystemMessage(args.SystemMessage))
 
 	return &LanguageModel{
 		userId:       userId,
 		logger:       logger,
+		args:         args,
 		conversation: conversation,
 		tokenRecords: make([]*tokens.TokenRecord, 0),
 	}
@@ -46,19 +92,13 @@ on what model you are using:
 - Gemini: Uses the production tokenization endpoint, will be exact token counts.
 */
 func (l *LanguageModel) TokenEstimate(input *CompletionInput) (int, error) {
-	switch input.Model {
-	case GPT3_MODEL:
-		fallthrough
-	case GPT4_MODEL:
+	if strings.HasPrefix(input.Model, "gpt") {
 		return gptTokenizerApproximate("avg", input.Input)
-	case GEMINI_MODEL:
-		return geminiTokenizerAccurate(input.Input)
-	case ANTHROPIC_CLAUDE_INSTANT:
-		fallthrough
-	case ANTHROPIC_CLAUDE2:
+	} else if strings.HasPrefix(input.Model, "gemini") {
+		return l.geminiTokenizerAccurate(input.Input, input.Model)
+	} else if strings.HasPrefix(input.Model, "claude") {
 		return anthropicTokenizerAproximate(input.Input), nil
-
-	default:
+	} else {
 		return 0, fmt.Errorf("invalid model: %s", input.Model)
 	}
 }
@@ -76,13 +116,13 @@ func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInpu
 	logger.InfoContext(ctx, "Beginning completion ...")
 
 	// add a new conversation record for the specified input
-	l.conversation = append(l.conversation, &LLMMessage{
+	l.conversation = append(l.conversation, &LanguageModelMessage{
 		Role:    RoleUser,
 		Message: input.Input,
 	})
 
 	// send the request
-	response, err := gptCompletion(ctx, logger, l.userId, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGPT(l.conversation))
+	response, err := l.gptCompletion(ctx, logger, l.userId, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGPT(l.conversation))
 	if err != nil {
 		// remove the message from the conversation
 		l.conversation = l.conversation[:len(l.conversation)-1]
@@ -107,19 +147,19 @@ func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionI
 	logger.InfoContext(ctx, "Beginning completion ...")
 
 	logger.DebugContext(ctx, "Calculating the input tokens ...")
-	inTokens, err := geminiTokenizerAccurate(input.Input)
+	inTokens, err := l.geminiTokenizerAccurate(input.Input, input.Model)
 	if err != nil {
 		return "", fmt.Errorf("there was an issue calculating the token usage: %v", err)
 	}
 	logger.DebugContext(ctx, "Got input tokens", "tokens", inTokens)
 
-	l.conversation = append(l.conversation, &LLMMessage{
+	l.conversation = append(l.conversation, &LanguageModelMessage{
 		Role:    RoleUser,
 		Message: input.Input,
 	})
 
 	// send the request
-	response, err := geminiCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGemini(l.conversation))
+	response, err := l.geminiCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGemini(l.conversation))
 	if err != nil {
 		// remove the message from the conversation
 		l.conversation = l.conversation[:len(l.conversation)-1]
@@ -127,7 +167,7 @@ func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionI
 	}
 
 	logger.DebugContext(ctx, "Calculating the output tokens ...")
-	outTokens, err := geminiTokenizerAccurate(response.Candidates[0].Content.Parts[0].Text)
+	outTokens, err := l.geminiTokenizerAccurate(response.Candidates[0].Content.Parts[0].Text, input.Model)
 	if err != nil {
 		return "", fmt.Errorf("there was an issue calculating the token usage for this api call: %v", err)
 	}
@@ -151,13 +191,13 @@ func (l *LanguageModel) AnthropicCompletion(ctx context.Context, input *Completi
 	logger.InfoContext(ctx, "Beginning completion ...")
 
 	// add a new conversation record for the specified input
-	l.conversation = append(l.conversation, &LLMMessage{
+	l.conversation = append(l.conversation, &LanguageModelMessage{
 		Role:    RoleUser,
 		Message: input.Input,
 	})
 
 	// send the request
-	response, err := anthropicCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToAnthropic(l.conversation))
+	response, err := l.anthropicCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToAnthropic(l.conversation))
 	if err != nil {
 		// remove the message from the conversation
 		l.conversation = l.conversation[:len(l.conversation)-1]

@@ -1,4 +1,4 @@
-# GoLLM
+# GoLanguageModel
 
 Simple abstractions over LLM providers in Go to allow for complex LLM apps.
 
@@ -9,14 +9,14 @@ Currently supported LLMs:
 - Anthropic Claude 2.1
 - Anthropic Claude Instant 1.2
 
-## LLM Abstraction
+## LanguageModel Abstraction
 
-The LLM abstraction allows for multiple LLMs to be used in the same conversation at different points. The `LLM` object hosts the conversation state in a conversation object that is LLM agnostic, and when a specific LLM completion is called, the internal conversation state get transformed into the specific format for the LLM. Then, on response, the message is parsed from the LLM provider and stored in the agnostic state inside the LLM object.
+The LLM abstraction allows for multiple LLMs to be used in the same conversation at different points. The `LanguageModel` object hosts the conversation state in a conversation object that is LLM agnostic, and when a specific LLM completion is called, the internal conversation state get transformed into the specific format for the LLM. Then, on response, the message is parsed from the LLM provider and stored in the agnostic state inside the LLM object.
 
 This simple abstraction lets you mix and match different LLMs at any point of the conversation. For example, as seen in `llm_test.go`:
 
 ```go
-model := NewLLM(TEST_USER_ID, logger, "You are a pirate on a deserted island")
+model := NewLanguageModel(TEST_USER_ID, logger, "You are a pirate on a deserted island")
 
 var err error
 input1 := &CompletionInput{

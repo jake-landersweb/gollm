@@ -15,7 +15,7 @@ import (
 	"github.com/jake-landersweb/gollm/src/ltypes"
 )
 
-func geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {
+func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 
 	if apiKey == "" || apiKey == "null" {
@@ -68,7 +68,7 @@ func geminiCompletion(ctx context.Context, logger *slog.Logger, model string, te
 	}
 
 	// create the request
-	url := fmt.Sprintf("%s/%s:generateContent?key=%s", GEMINI_BASE_URL, model, apiKey)
+	url := fmt.Sprintf("%s/%s:generateContent?key=%s", l.args.GeminiBaseUrl, model, apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(enc))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
@@ -150,7 +150,7 @@ func geminiCompletion(ctx context.Context, logger *slog.Logger, model string, te
 	return nil, err
 }
 
-func geminiTokenizerAccurate(input string) (int, error) {
+func (l *LanguageModel) geminiTokenizerAccurate(input string, model string) (int, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 
 	if apiKey == "" || apiKey == "null" {
@@ -175,7 +175,7 @@ func geminiTokenizerAccurate(input string) (int, error) {
 	}
 
 	// create the request
-	url := fmt.Sprintf("%s/%s:countTokens?key=%s", GEMINI_BASE_URL, GEMINI_MODEL, apiKey)
+	url := fmt.Sprintf("%s/%s:countTokens?key=%s", l.args.GeminiBaseUrl, model, apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(enc))
 	if err != nil {
 		return 0, fmt.Errorf("error creating request: %v", err)

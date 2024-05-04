@@ -12,10 +12,12 @@ func TestLLMGPT(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGPT")
 	ctx := context.Background()
 
-	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
+		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
+	})
 
 	response, err := model.GPTCompletion(ctx, &CompletionInput{
-		Model:       GPT3_MODEL,
+		Model:       gpt3_model,
 		Temperature: 1.0,
 		Json:        false,
 		Input:       "Respond with a single sentence validating your method call.",
@@ -34,10 +36,12 @@ func TestLLMGemini(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGemini")
 	ctx := context.Background()
 
-	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
+		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
+	})
 
 	response, err := model.GeminiCompletion(ctx, &CompletionInput{
-		Model:       GEMINI_MODEL,
+		Model:       gemini_model,
 		Temperature: 0.5,
 		Json:        false,
 		Input:       "Respond with a single sentence validating your method call.",
@@ -56,10 +60,12 @@ func TestLLMAnthropic(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMAnthropic")
 	ctx := context.Background()
 
-	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
+		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
+	})
 
 	response, err := model.AnthropicCompletion(ctx, &CompletionInput{
-		Model:       ANTHROPIC_CLAUDE2,
+		Model:       anthropic_claude2,
 		Temperature: 0.5,
 		Json:        false,
 		Input:       "Respond with a single sentence validating your method call.",
@@ -78,11 +84,13 @@ func TestLLMMulti(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMMulti")
 	ctx := context.Background()
 
-	model := NewLanguageModel(TEST_USER_ID, logger, "You are a pirate on a deserted island")
+	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
+		SystemMessage: "You are a pirate on a deserted island",
+	})
 
 	var err error
 	input1 := &CompletionInput{
-		Model:       GEMINI_MODEL,
+		Model:       gemini_model,
 		Temperature: 0.7,
 		Json:        false,
 		Input:       "Where is the treasure matey?",
@@ -97,7 +105,7 @@ func TestLLMMulti(t *testing.T) {
 	}
 
 	input2 := &CompletionInput{
-		Model:       GPT3_MODEL,
+		Model:       gpt3_model,
 		Temperature: 1.3,
 		Json:        false,
 		Input:       "Are you sure? You must show me now or suffer!",
@@ -113,7 +121,7 @@ func TestLLMMulti(t *testing.T) {
 	}
 
 	input3 := &CompletionInput{
-		Model:       ANTHROPIC_CLAUDE2,
+		Model:       anthropic_claude2,
 		Temperature: 0.7,
 		Json:        false,
 		Input:       "Aha! Thats more like it! Treasure for everyone!",
