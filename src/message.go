@@ -7,15 +7,15 @@ import (
 	"github.com/jake-landersweb/gollm/src/ltypes"
 )
 
-type LLMRole int
+type LanguageModelRole int
 
 const (
-	RoleSystem LLMRole = iota
+	RoleSystem LanguageModelRole = iota
 	RoleUser
 	RoleAI
 )
 
-func (r LLMRole) ToString() string {
+func (r LanguageModelRole) ToString() string {
 	switch r {
 	case RoleSystem:
 		return "System"
@@ -28,28 +28,28 @@ func (r LLMRole) ToString() string {
 	}
 }
 
-type LLMMessage struct {
-	Role    LLMRole
+type LanguageModelMessage struct {
+	Role    LanguageModelRole
 	Message string
 }
 
-func NewSystemMessage(input string) *LLMMessage {
-	return &LLMMessage{
+func NewSystemMessage(input string) *LanguageModelMessage {
+	return &LanguageModelMessage{
 		Role:    RoleSystem,
 		Message: input,
 	}
 }
 
-func NewUserMessage(input string) *LLMMessage {
-	return &LLMMessage{
+func NewUserMessage(input string) *LanguageModelMessage {
+	return &LanguageModelMessage{
 		Role:    RoleUser,
 		Message: input,
 	}
 }
 
 // Creates a new `LLMMessage` from an input `GPTCompletionMessage`
-func NewMessageFromGPT(input *ltypes.GPTCompletionMessage) *LLMMessage {
-	msg := &LLMMessage{
+func NewMessageFromGPT(input *ltypes.GPTCompletionMessage) *LanguageModelMessage {
+	msg := &LanguageModelMessage{
 		Message: input.Content,
 	}
 	switch input.Role {
@@ -68,8 +68,8 @@ For parsing the response of the gemini api into an `LLMMessage`. This is NOT for
 to convert a list of `GemContent` messages, as you should use `LLMMessagesFromGemini` to
 ensure the system message is parsed correctly
 */
-func NewMessageFromGemini(input *ltypes.GemContent) *LLMMessage {
-	msg := &LLMMessage{
+func NewMessageFromGemini(input *ltypes.GemContent) *LanguageModelMessage {
+	msg := &LanguageModelMessage{
 		Message: input.Parts[0].Text,
 	}
 	switch input.Role {
@@ -86,8 +86,8 @@ Parses an `AnthropicContent` into an `LLMMessage`.
 This function should only be used to parse the response from the Anthropic API, as it
 does not take into account different roles and message types.
 */
-func NewMessageFromAnthropic(input *ltypes.AnthropicContent) *LLMMessage {
-	return &LLMMessage{
+func NewMessageFromAnthropic(input *ltypes.AnthropicContent) *LanguageModelMessage {
+	return &LanguageModelMessage{
 		Role:    RoleAI,
 		Message: input.Text,
 	}
@@ -98,8 +98,8 @@ Parses a list of `GPTCompletionMessage` into a list of `LLMMessage`. These metho
 be used over manual converstion to ensure correct serialization and message parsing from
 the implementation specific messaging system and the `LLMMessage` abstraction.
 */
-func LLMMessagesFromGPT(input []*ltypes.GPTCompletionMessage) []*LLMMessage {
-	resp := make([]*LLMMessage, 0)
+func LLMMessagesFromGPT(input []*ltypes.GPTCompletionMessage) []*LanguageModelMessage {
+	resp := make([]*LanguageModelMessage, 0)
 
 	for _, item := range input {
 		resp = append(resp, NewMessageFromGPT(item))
@@ -108,7 +108,7 @@ func LLMMessagesFromGPT(input []*ltypes.GPTCompletionMessage) []*LLMMessage {
 	return resp
 }
 
-func LLMMessagesToGPT(messages []*LLMMessage) []*ltypes.GPTCompletionMessage {
+func LLMMessagesToGPT(messages []*LanguageModelMessage) []*ltypes.GPTCompletionMessage {
 	resp := make([]*ltypes.GPTCompletionMessage, 0)
 
 	for _, item := range messages {
@@ -137,25 +137,25 @@ Parses a list of `GemContent` into a list of `LLMMessage`. These methods should
 be used over manual converstion to ensure correct serialization and message parsing from
 the implementation specific messaging system and the `LLMMessage` abstraction.
 */
-func LLMMessagesFromGemini(messages []*ltypes.GemContent) []*LLMMessage {
-	resp := make([]*LLMMessage, 0)
+func LLMMessagesFromGemini(messages []*ltypes.GemContent) []*LanguageModelMessage {
+	resp := make([]*LanguageModelMessage, 0)
 
 	// loop over messages and perform parsing
 	for _, item := range messages {
 
 		// check for system message
-		if strings.HasPrefix(item.Parts[0].Text, GEMINI_SYSTEM_MESSAGE) {
+		if strings.HasPrefix(item.Parts[0].Text, gemini_system_message) {
 			// split into two messages
 			parsed := strings.Split(item.Parts[0].Text, "\n\n")
 			// remove the system message from the first parsed message
-			sys := strings.ReplaceAll(parsed[0], fmt.Sprintf("%s: ", GEMINI_SYSTEM_MESSAGE), "")
+			sys := strings.ReplaceAll(parsed[0], fmt.Sprintf("%s: ", gemini_system_message), "")
 			// add the system message
 			resp = append(resp, NewSystemMessage(sys))
 			// add the user message
 			resp = append(resp, NewUserMessage(parsed[1]))
 		} else {
 			// basic message
-			msg := &LLMMessage{
+			msg := &LanguageModelMessage{
 				Message: item.Parts[0].Text,
 			}
 			switch item.Role {
@@ -171,7 +171,7 @@ func LLMMessagesFromGemini(messages []*ltypes.GemContent) []*LLMMessage {
 	return resp
 }
 
-func LLMMessagesToGemini(messages []*LLMMessage) []*ltypes.GemContent {
+func LLMMessagesToGemini(messages []*LanguageModelMessage) []*ltypes.GemContent {
 	resp := make([]*ltypes.GemContent, 0)
 
 	for _, item := range messages {
@@ -182,7 +182,7 @@ func LLMMessagesToGemini(messages []*LLMMessage) []*ltypes.GemContent {
 		case RoleSystem:
 			// create a custom message as there is not a 'system' message in gemini
 			role = "user"
-			message = fmt.Sprintf("%s: %s", GEMINI_SYSTEM_MESSAGE, item.Message)
+			message = fmt.Sprintf("%s: %s", gemini_system_message, item.Message)
 		case RoleAI:
 			role = "model"
 		default:
@@ -209,8 +209,8 @@ func LLMMessagesToGemini(messages []*LLMMessage) []*ltypes.GemContent {
 	return resp
 }
 
-func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LLMMessage {
-	resp := make([]*LLMMessage, 0)
+func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LanguageModelMessage {
+	resp := make([]*LanguageModelMessage, 0)
 
 	for _, item := range messages {
 		switch item.Role {
@@ -219,7 +219,7 @@ func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LLMMessage
 		case "user":
 			resp = append(resp, NewUserMessage(item.Content))
 		case "assistant":
-			resp = append(resp, &LLMMessage{
+			resp = append(resp, &LanguageModelMessage{
 				Role:    RoleAI,
 				Message: item.Content,
 			})
@@ -229,7 +229,7 @@ func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LLMMessage
 	return resp
 }
 
-func LLMMessagesToAnthropic(messages []*LLMMessage) []*ltypes.AnthropicMessage {
+func LLMMessagesToAnthropic(messages []*LanguageModelMessage) []*ltypes.AnthropicMessage {
 	resp := make([]*ltypes.AnthropicMessage, 0)
 
 	for _, item := range messages {

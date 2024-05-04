@@ -77,11 +77,11 @@ func TestMultiModelMessageConversion(t *testing.T) {
 	}
 }
 
-func getTestConversation() []*LLMMessage {
-	messages := make([]*LLMMessage, 0)
+func getTestConversation() []*LanguageModelMessage {
+	messages := make([]*LanguageModelMessage, 0)
 	messages = append(messages, NewSystemMessage("Conduct this conversation like you are a pirate"))
 	messages = append(messages, NewUserMessage("ahoy matey, how are you this fine hour"))
-	messages = append(messages, &LLMMessage{
+	messages = append(messages, &LanguageModelMessage{
 		Role:    RoleAI,
 		Message: "Follow me, I'll lead ye to the palm tree where the treasure be buried. But be warned, it be guarded by the cursed spirit of Captain Blackbeard himself!",
 	})

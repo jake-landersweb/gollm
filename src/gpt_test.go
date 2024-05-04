@@ -23,7 +23,8 @@ func TestGPTTextCompletion(t *testing.T) {
 		Role:    "user",
 	})
 
-	response, err := gptCompletion(context.TODO(), logger, TEST_USER_ID, GPT3_MODEL, 1.0, false, "", messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -50,7 +51,8 @@ func TestGPTJSONCompletion(t *testing.T) {
 		Role:    "user",
 	})
 
-	response, err := gptCompletion(context.TODO(), logger, TEST_USER_ID, GPT3_MODEL, 1.0, true, schema, messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, true, schema, messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return

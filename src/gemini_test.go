@@ -11,7 +11,9 @@ import (
 )
 
 func TestGeminiTokens(t *testing.T) {
-	tokens, err := geminiTokenizerAccurate("This is an input string where I would like to know how many tokens make it up. Some grammer, can also be us'ed potentially (hopefully): yes.")
+	logger := defaultLogger(slog.LevelDebug).With("test", "TestGeminiTokens")
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	tokens, err := llm.geminiTokenizerAccurate("This is an input string where I would like to know how many tokens make it up. Some grammer, can also be us'ed potentially (hopefully): yes.", gemini_model)
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -25,12 +27,13 @@ func TestGeminiTextCompletion(t *testing.T) {
 	ctx := context.Background()
 
 	// make the messages
-	raw := make([]*LLMMessage, 0)
+	raw := make([]*LanguageModelMessage, 0)
 	raw = append(raw, NewSystemMessage("You are a model that is being used to validate that method calls to your api work in a go testing environment."))
 	raw = append(raw, NewUserMessage("Please respond with a single sentence."))
 	messages := LLMMessagesToGemini(raw)
 
-	response, err := geminiCompletion(ctx, logger, GEMINI_MODEL, 0.5, false, "", messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, false, "", messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -46,14 +49,15 @@ func TestGeminiJSONCompletion(t *testing.T) {
 	schema := `{"message": string, "date": int}`
 
 	// make the messages
-	raw := make([]*LLMMessage, 0)
+	raw := make([]*LanguageModelMessage, 0)
 	raw = append(raw, NewSystemMessage("You are a model that is being used to validate that method calls to your api work in a go testing environment."))
 	raw = append(raw, NewUserMessage("Please respond with a reasonable response."))
 	messages := LLMMessagesToGemini(raw)
 
 	fmt.Println(*messages[0])
 
-	response, err := geminiCompletion(ctx, logger, GEMINI_MODEL, 0.5, true, schema, messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, true, schema, messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return

@@ -17,7 +17,7 @@ import (
 	"github.com/jake-landersweb/gollm/src/ltypes"
 )
 
-func gptCompletion(ctx context.Context, logger *slog.Logger, userId string, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GPTCompletionMessage) (*ltypes.GPTCompletionResponse, error) {
+func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, userId string, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GPTCompletionMessage) (*ltypes.GPTCompletionResponse, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" || apiKey == "null" {
 		return nil, fmt.Errorf("the env variable `OPENAI_API_KEY` is required to be set")
@@ -53,7 +53,7 @@ func gptCompletion(ctx context.Context, logger *slog.Logger, userId string, mode
 	}
 
 	// create the request
-	req, err := http.NewRequest("POST", GPT_BASE_URL, bytes.NewBuffer(enc))
+	req, err := http.NewRequest("POST", l.args.GptBaseUrl, bytes.NewBuffer(enc))
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue creating the http request: %v", err)
 	}
@@ -110,7 +110,7 @@ func gptCompletion(ctx context.Context, logger *slog.Logger, userId string, mode
 			case ltypes.GPT_ERROR_TOKENS_LIMIT:
 				// too many tokens, trim the message and try again
 				tmp := messages[len(messages)-1]
-				tmp.Content = tmp.Content[:GPT_MAX_TOKENS]
+				tmp.Content = tmp.Content[:l.args.GptMaxTokens]
 			case ltypes.GPT_ERROR_AUTH:
 				return nil, fmt.Errorf("the user is not authenticated: %s", string(body))
 			case ltypes.GPT_ERROR_NOT_FOUND:
