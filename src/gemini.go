@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/jake-landersweb/gollm/src/ltypes"
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
 func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {

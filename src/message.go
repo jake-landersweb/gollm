@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jake-landersweb/gollm/src/ltypes"
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
 type LanguageModelRole int

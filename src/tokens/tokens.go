@@ -2,7 +2,7 @@ package tokens
 
 import (
 	"github.com/google/uuid"
-	"github.com/jake-landersweb/gollm/src/ltypes"
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
 type TokenRecord struct {
