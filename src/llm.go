@@ -8,7 +8,7 @@ import (
 	"github.com/jake-landersweb/gollm/src/tokens"
 )
 
-type LLM struct {
+type LanguageModel struct {
 	userId string
 	logger *slog.Logger
 
@@ -24,12 +24,12 @@ type CompletionInput struct {
 	Input       string
 }
 
-func NewLLM(userId string, logger *slog.Logger, sysMsg string) *LLM {
+func NewLLM(userId string, logger *slog.Logger, sysMsg string) *LanguageModel {
 	// initialize the conversation
 	conversation := make([]*LLMMessage, 0)
 	conversation = append(conversation, NewSystemMessage(sysMsg))
 
-	return &LLM{
+	return &LanguageModel{
 		userId:       userId,
 		logger:       logger,
 		conversation: conversation,
@@ -45,7 +45,7 @@ on what model you are using:
 
 - Gemini: Uses the production tokenization endpoint, will be exact token counts.
 */
-func (l *LLM) TokenEstimate(input *CompletionInput) (int, error) {
+func (l *LanguageModel) TokenEstimate(input *CompletionInput) (int, error) {
 	switch input.Model {
 	case GPT3_MODEL:
 		fallthrough
@@ -63,7 +63,7 @@ func (l *LLM) TokenEstimate(input *CompletionInput) (int, error) {
 	}
 }
 
-func (l *LLM) PrintConversation() {
+func (l *LanguageModel) PrintConversation() {
 	fmt.Println("\n\n --- LLM Conversation --- ")
 	for _, item := range l.conversation {
 		fmt.Println("[[", item.Role.ToString(), "]]")
@@ -71,7 +71,7 @@ func (l *LLM) PrintConversation() {
 	}
 }
 
-func (l *LLM) GPTCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInput) (string, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
 
@@ -102,7 +102,7 @@ func (l *LLM) GPTCompletion(ctx context.Context, input *CompletionInput) (string
 	return response.Choices[0].Message.Content, nil
 }
 
-func (l *LLM) GeminiCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionInput) (string, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
 
@@ -146,7 +146,7 @@ func (l *LLM) GeminiCompletion(ctx context.Context, input *CompletionInput) (str
 	return response.Candidates[0].Content.Parts[0].Text, nil
 }
 
-func (l *LLM) AnthropicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+func (l *LanguageModel) AnthropicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
 
