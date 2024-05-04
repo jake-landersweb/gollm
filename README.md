@@ -11,6 +11,8 @@ Currently supported LLMs:
 
 ## LanguageModel Abstraction
 
+**NOTE THIS DOCUMENTATION IS A BIT OUT OF DATE.** The functionality is the same, but there was a bit of re-architecture to support more config from the user.
+
 The LLM abstraction allows for multiple LLMs to be used in the same conversation at different points. The `LanguageModel` object hosts the conversation state in a conversation object that is LLM agnostic, and when a specific LLM completion is called, the internal conversation state get transformed into the specific format for the LLM. Then, on response, the message is parsed from the LLM provider and stored in the agnostic state inside the LLM object.
 
 This simple abstraction lets you mix and match different LLMs at any point of the conversation. For example, as seen in `llm_test.go`:
