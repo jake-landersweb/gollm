@@ -1,4 +1,4 @@
-package main
+package gollm
 
 const test_user_id = "go-test"
 

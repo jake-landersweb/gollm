@@ -1,4 +1,4 @@
-package main
+package gollm
 
 import (
 	"log/slog"
