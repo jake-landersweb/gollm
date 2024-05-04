@@ -24,7 +24,7 @@ type CompletionInput struct {
 	Input       string
 }
 
-func NewLLM(userId string, logger *slog.Logger, sysMsg string) *LanguageModel {
+func NewLanguageModel(userId string, logger *slog.Logger, sysMsg string) *LanguageModel {
 	// initialize the conversation
 	conversation := make([]*LLMMessage, 0)
 	conversation = append(conversation, NewSystemMessage(sysMsg))

@@ -12,7 +12,7 @@ func TestLLMGPT(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGPT")
 	ctx := context.Background()
 
-	model := NewLLM(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
 
 	response, err := model.GPTCompletion(ctx, &CompletionInput{
 		Model:       GPT3_MODEL,
@@ -34,7 +34,7 @@ func TestLLMGemini(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGemini")
 	ctx := context.Background()
 
-	model := NewLLM(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
 
 	response, err := model.GeminiCompletion(ctx, &CompletionInput{
 		Model:       GEMINI_MODEL,
@@ -56,7 +56,7 @@ func TestLLMAnthropic(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMAnthropic")
 	ctx := context.Background()
 
-	model := NewLLM(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
+	model := NewLanguageModel(TEST_USER_ID, logger, "You are being used in a go test environment to validate your API calls are working.")
 
 	response, err := model.AnthropicCompletion(ctx, &CompletionInput{
 		Model:       ANTHROPIC_CLAUDE2,
@@ -78,7 +78,7 @@ func TestLLMMulti(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMMulti")
 	ctx := context.Background()
 
-	model := NewLLM(TEST_USER_ID, logger, "You are a pirate on a deserted island")
+	model := NewLanguageModel(TEST_USER_ID, logger, "You are a pirate on a deserted island")
 
 	var err error
 	input1 := &CompletionInput{
