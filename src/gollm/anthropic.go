@@ -16,10 +16,12 @@ import (
 )
 
 func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.AnthropicMessage) (*ltypes.AnthropicResponse, error) {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-
-	if apiKey == "" || apiKey == "null" {
-		return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+	apiKey := l.args.AnthropicApiKey
+	if apiKey == "" {
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" || apiKey == "null" {
+			return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+		}
 	}
 
 	// parse a system message if exists

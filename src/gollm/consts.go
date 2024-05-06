@@ -20,3 +20,14 @@ const anthropic_claude2 = "claude-2.1"
 
 // const anthropic_claude_instant = "claude-instant-1.2"
 const anthropic_max_tokens = 4096
+
+const openai_embeddings_base_url = "https://api.openai.com/v1/embeddings"
+const openai_embeddings_dimensions = 512
+const openai_embeddings_chunk_size_default = 512
+const OPENAI_EMBEDDINGS_INPUT_MAX = 8191
+
+type ModelOpenAIEmbeddings = string
+
+const (
+	OPENAI_EMBEDDINGS_MODEL ModelOpenAIEmbeddings = "text-embedding-3-small"
+)

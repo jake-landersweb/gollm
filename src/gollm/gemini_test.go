@@ -12,7 +12,7 @@ import (
 
 func TestGeminiTokens(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestGeminiTokens")
-	llm := NewLanguageModel(test_user_id, logger, nil)
+	llm := NewLanguageModel(test_user_id, logger, "", nil)
 	tokens, err := llm.geminiTokenizerAccurate("This is an input string where I would like to know how many tokens make it up. Some grammer, can also be us'ed potentially (hopefully): yes.", gemini_model)
 	assert.Nil(t, err)
 	if err != nil {
@@ -32,7 +32,7 @@ func TestGeminiTextCompletion(t *testing.T) {
 	raw = append(raw, NewUserMessage("Please respond with a single sentence."))
 	messages := LLMMessagesToGemini(raw)
 
-	llm := NewLanguageModel(test_user_id, logger, nil)
+	llm := NewLanguageModel(test_user_id, logger, "", nil)
 	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, false, "", messages)
 	assert.Nil(t, err)
 	if err != nil {
@@ -56,7 +56,7 @@ func TestGeminiJSONCompletion(t *testing.T) {
 
 	fmt.Println(*messages[0])
 
-	llm := NewLanguageModel(test_user_id, logger, nil)
+	llm := NewLanguageModel(test_user_id, logger, "", nil)
 	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, true, schema, messages)
 	assert.Nil(t, err)
 	if err != nil {

@@ -16,10 +16,12 @@ import (
 )
 
 func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
-
-	if apiKey == "" || apiKey == "null" {
-		return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+	apiKey := l.args.GeminiApiKey
+	if apiKey == "" {
+		apiKey := os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" || apiKey == "null" {
+			return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+		}
 	}
 
 	comprequest := &ltypes.GemRequestBody{
@@ -151,10 +153,12 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 }
 
 func (l *LanguageModel) geminiTokenizerAccurate(input string, model string) (int, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
-
-	if apiKey == "" || apiKey == "null" {
-		return 0, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+	apiKey := l.args.GeminiApiKey
+	if apiKey == "" {
+		apiKey = os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" || apiKey == "null" {
+			return 0, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+		}
 	}
 
 	// create the body

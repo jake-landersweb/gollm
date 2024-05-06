@@ -12,9 +12,7 @@ func TestLLMGPT(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGPT")
 	ctx := context.Background()
 
-	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
-		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
-	})
+	model := NewLanguageModel(test_user_id, logger, "You are being used in a go test environment to validate your API calls are working.", nil)
 
 	response, err := model.GPTCompletion(ctx, &CompletionInput{
 		Model:       gpt3_model,
@@ -36,9 +34,7 @@ func TestLLMGemini(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMGemini")
 	ctx := context.Background()
 
-	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
-		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
-	})
+	model := NewLanguageModel(test_user_id, logger, "You are being used in a go test environment to validate your API calls are working.", nil)
 
 	response, err := model.GeminiCompletion(ctx, &CompletionInput{
 		Model:       gemini_model,
@@ -60,9 +56,7 @@ func TestLLMAnthropic(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMAnthropic")
 	ctx := context.Background()
 
-	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
-		SystemMessage: "You are being used in a go test environment to validate your API calls are working.",
-	})
+	model := NewLanguageModel(test_user_id, logger, "You are being used in a go test environment to validate your API calls are working.", nil)
 
 	response, err := model.AnthropicCompletion(ctx, &CompletionInput{
 		Model:       anthropic_claude2,
@@ -84,9 +78,7 @@ func TestLLMMulti(t *testing.T) {
 	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMMulti")
 	ctx := context.Background()
 
-	model := NewLanguageModel(test_user_id, logger, &NewLanguageModelArgs{
-		SystemMessage: "You are a pirate on a deserted island",
-	})
+	model := NewLanguageModel(test_user_id, logger, "You are a pirate on a deserted island", nil)
 
 	var err error
 	input1 := &CompletionInput{
