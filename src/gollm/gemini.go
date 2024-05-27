@@ -18,8 +18,8 @@ import (
 func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {
 	apiKey := l.args.GeminiApiKey
 	if apiKey == "" {
-		apiKey := os.Getenv("GEMINI_API_KEY")
-		if apiKey == "" || apiKey == "null" {
+		apiKey = os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
 			return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
 		}
 	}
@@ -71,6 +71,7 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 
 	// create the request
 	url := fmt.Sprintf("%s/%s:generateContent?key=%s", l.args.GeminiBaseUrl, model, apiKey)
+	fmt.Print(url)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(enc))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
@@ -211,3 +212,7 @@ func (l *LanguageModel) geminiTokenizerAccurate(input string, model string) (int
 
 	return body["totalTokens"], nil
 }
+
+// func (l *LanguageModel) getGoogleModels() {
+
+// }

@@ -243,7 +243,6 @@ func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionI
 	logger.InfoContext(ctx, "Completed Gemini completion")
 	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
 
-	// return the message
 	return response.Candidates[0].Content.Parts[0].Text, nil
 }
 

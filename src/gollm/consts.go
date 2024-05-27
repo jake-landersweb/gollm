@@ -10,7 +10,7 @@ const gpt3_model = "gpt-3.5-turbo-0125"
 // const gpt4_model = "gpt-4-0125-preview"
 const gpt_max_tokens = 8096
 
-const gemini_base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+const gemini_base_url = "https://generativelanguage.googleapis.com/v1/models"
 const gemini_system_message = "This is the system message of the conversation, and should be used as a general reference for the entire conversation"
 const gemini_model = "gemini-pro"
 

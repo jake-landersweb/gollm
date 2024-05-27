@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -53,4 +54,10 @@ func convertSlice[T any, U any](list []T, convert func(T) U) []U {
 		result[i] = convert(v)
 	}
 	return result
+}
+
+func cleanForJson(input string) string {
+	input = strings.ReplaceAll(input, "```json", "")
+	input = strings.ReplaceAll(input, "```", "")
+	return input
 }
