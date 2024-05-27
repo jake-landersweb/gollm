@@ -118,7 +118,7 @@ func NewLanguageModelFromConversation(
 	}
 }
 
-func (l *LanguageModel) GetConversation(input *CompletionInput) []*LanguageModelMessage {
+func (l *LanguageModel) GetConversation() []*LanguageModelMessage {
 	return l.conversation
 }
 
@@ -168,6 +168,9 @@ func (l *LanguageModel) DynamicCompletion(ctx context.Context, input *Completion
 // Perform a completion specifically using OpenAI as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
 func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+	if input == nil {
+		return "", fmt.Errorf("the input cannot be nil")
+	}
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
 
