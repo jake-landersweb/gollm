@@ -18,9 +18,12 @@ import (
 )
 
 func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, userId string, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GPTCompletionMessage) (*ltypes.GPTCompletionResponse, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	if apiKey == "" || apiKey == "null" {
-		return nil, fmt.Errorf("the env variable `OPENAI_API_KEY` is required to be set")
+	apiKey := l.args.OpenAIApiKey
+	if apiKey == "" {
+		apiKey = os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" || apiKey == "null" {
+			return nil, fmt.Errorf("the env variable `OPENAI_API_KEY` is required to be set")
+		}
 	}
 
 	// create the body
@@ -41,7 +44,7 @@ func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, 
 
 		// add the required json validation text and schema for the model to follow
 		comprequest.ResponseFormat = ltypes.GPTRespFormat{Type: "json_object"}
-		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease respond to this message ONLY with the given json schema.\n\nJSON SCHEMA:\n%s", comprequest.Messages[len(comprequest.Messages)-1].Content, jsonSchema)
+		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease respond to this message ONLY with the given JSON schema.\n\nJSON SCHEMA:\n%s", comprequest.Messages[len(comprequest.Messages)-1].Content, jsonSchema)
 	} else {
 		logger.DebugContext(ctx, "Running with json mode DISABLED")
 		comprequest.ResponseFormat = ltypes.GPTRespFormat{Type: "text"}

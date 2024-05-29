@@ -27,26 +27,25 @@ type CompletionInput struct {
 }
 
 type NewLanguageModelArgs struct {
-	SystemMessage string
-
 	// OpenAI Configs
 	GptBaseUrl   string
 	GptMaxTokens int
+	OpenAIApiKey string // If not defined, the env variable `OPENAI_API_KEY` will be used
 
 	// Gemini Configs
 	GeminiBaseUrl string
-	// GeminiSystemMessageTemplate string
+	GeminiApiKey  string // If not defined, the env variable `GEMINI_API_KEY` will be used
 
 	// Anthropic Configs
 	AnthropicBaseUrl   string
 	AnthropicVersion   string
 	AnthropicMaxTokens int
+	AnthropicApiKey    string // If not defined, the env variable `ANTHROPIC_API_KEY` will be used
 }
 
-func NewLanguageModel(userId string, logger *slog.Logger, args *NewLanguageModelArgs) *LanguageModel {
-	// parse the arguments
+func parseArguments(args *NewLanguageModelArgs) *NewLanguageModelArgs {
 	if args == nil {
-		args = &NewLanguageModelArgs{SystemMessage: default_system_message}
+		args = &NewLanguageModelArgs{}
 	}
 	if args.GptBaseUrl == "" {
 		args.GptBaseUrl = gpt_base_url
@@ -57,9 +56,6 @@ func NewLanguageModel(userId string, logger *slog.Logger, args *NewLanguageModel
 	if args.GeminiBaseUrl == "" {
 		args.GeminiBaseUrl = gemini_base_url
 	}
-	// if args.GeminiSystemMessageTemplate == "" {
-	// 	args.GeminiSystemMessageTemplate = gemini_system_message
-	// }
 	if args.AnthropicBaseUrl == "" {
 		args.AnthropicBaseUrl = anthropic_base_url
 	}
@@ -69,10 +65,25 @@ func NewLanguageModel(userId string, logger *slog.Logger, args *NewLanguageModel
 	if args.AnthropicMaxTokens == 0 {
 		args.AnthropicMaxTokens = anthropic_max_tokens
 	}
+	return args
+}
+
+// Create a new language model from a system message.
+func NewLanguageModel(
+	userId string,
+	logger *slog.Logger,
+	sysMessage string,
+	args *NewLanguageModelArgs,
+) *LanguageModel {
+	args = parseArguments(args)
+
+	if sysMessage == "" {
+		sysMessage = default_system_message
+	}
 
 	// initialize the conversation
 	conversation := make([]*LanguageModelMessage, 0)
-	conversation = append(conversation, NewSystemMessage(args.SystemMessage))
+	conversation = append(conversation, NewSystemMessage(sysMessage))
 
 	return &LanguageModel{
 		userId:       userId,
@@ -81,6 +92,34 @@ func NewLanguageModel(userId string, logger *slog.Logger, args *NewLanguageModel
 		conversation: conversation,
 		tokenRecords: make([]*tokens.TokenRecord, 0),
 	}
+}
+
+// Create a new language model that inherets from a previous conversation
+func NewLanguageModelFromConversation(
+	userId string,
+	logger *slog.Logger,
+	conversation []*LanguageModelMessage,
+	args *NewLanguageModelArgs,
+) *LanguageModel {
+	args = parseArguments(args)
+
+	if conversation == nil {
+		// initialize the conversation
+		conversation = make([]*LanguageModelMessage, 0)
+		conversation = append(conversation, NewSystemMessage(default_system_message))
+	}
+
+	return &LanguageModel{
+		userId:       userId,
+		logger:       logger,
+		args:         args,
+		conversation: conversation,
+		tokenRecords: make([]*tokens.TokenRecord, 0),
+	}
+}
+
+func (l *LanguageModel) GetConversation() []*LanguageModelMessage {
+	return l.conversation
 }
 
 /*
@@ -111,7 +150,27 @@ func (l *LanguageModel) PrintConversation() {
 	}
 }
 
+// Uses the `Model` passed in the `input` to dynamically parse which completion method to use.
+// This should be the default method used in most cases, but the provider-specific functions
+// (i.e GPTCompletion) are available if needed.
+func (l *LanguageModel) DynamicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+	if strings.HasPrefix(input.Model, "gpt") {
+		return l.GPTCompletion(ctx, input)
+	} else if strings.HasPrefix(input.Model, "gemini") {
+		return l.GeminiCompletion(ctx, input)
+	} else if strings.HasPrefix(input.Model, "claude") {
+		return l.AnthropicCompletion(ctx, input)
+	} else {
+		return "", fmt.Errorf("invalid model type: %s", input.Model)
+	}
+}
+
+// Perform a completion specifically using OpenAI as the provider.
+// To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
 func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+	if input == nil {
+		return "", fmt.Errorf("the input cannot be nil")
+	}
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
 
@@ -142,6 +201,8 @@ func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInpu
 	return response.Choices[0].Message.Content, nil
 }
 
+// Perform a completion specifically using Google as the provider.
+// To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
 func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionInput) (string, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
@@ -182,10 +243,11 @@ func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionI
 	logger.InfoContext(ctx, "Completed Gemini completion")
 	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
 
-	// return the message
 	return response.Candidates[0].Content.Parts[0].Text, nil
 }
 
+// Perform a completion specifically using Anthropic as the provider.
+// To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
 func (l *LanguageModel) AnthropicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
 	logger.InfoContext(ctx, "Beginning completion ...")
@@ -215,4 +277,8 @@ func (l *LanguageModel) AnthropicCompletion(ctx context.Context, input *Completi
 
 	// return the text string of the completion to let the caller parse as needed
 	return response.Content[0].Text, nil
+}
+
+func (l *LanguageModel) GetTokenRecords() []*tokens.TokenRecord {
+	return l.tokenRecords
 }

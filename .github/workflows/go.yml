@@ -31,10 +31,5 @@ jobs:
       run: go vet ./...
 
     - name: Go Test
-      run: go test -v ./src/gollm/*.go -json > TestResults-${{ matrix.go-version }}.json
+      run: go test -v ./src/gollm/*.go
 
-    - name: Upload Go Test Results
-      uses: actions/upload-artifact@v4
-      with:
-        name: Go-results-${{ matrix.go-version }}
-        path: TestResults-${{ matrix.go-version }}.json

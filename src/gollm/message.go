@@ -29,8 +29,8 @@ func (r LanguageModelRole) ToString() string {
 }
 
 type LanguageModelMessage struct {
-	Role    LanguageModelRole
-	Message string
+	Role    LanguageModelRole `json:"role"`
+	Message string            `json:"message"`
 }
 
 func NewSystemMessage(input string) *LanguageModelMessage {
@@ -64,7 +64,7 @@ func NewMessageFromGPT(input *ltypes.GPTCompletionMessage) *LanguageModelMessage
 }
 
 /*
-For parsing the response of the gemini api into an `LLMMessage`. This is NOT for use
+For parsing the response of the gemini api into an `LanguageModelMessage`. This is NOT for use
 to convert a list of `GemContent` messages, as you should use `LLMMessagesFromGemini` to
 ensure the system message is parsed correctly
 */
@@ -82,7 +82,7 @@ func NewMessageFromGemini(input *ltypes.GemContent) *LanguageModelMessage {
 }
 
 /*
-Parses an `AnthropicContent` into an `LLMMessage`.
+Parses an `AnthropicContent` into an `LanguageModelMessage`.
 This function should only be used to parse the response from the Anthropic API, as it
 does not take into account different roles and message types.
 */
@@ -94,9 +94,9 @@ func NewMessageFromAnthropic(input *ltypes.AnthropicContent) *LanguageModelMessa
 }
 
 /*
-Parses a list of `GPTCompletionMessage` into a list of `LLMMessage`. These methods should
+Parses a list of `GPTCompletionMessage` into a list of `LanguageModelMessage`. These methods should
 be used over manual converstion to ensure correct serialization and message parsing from
-the implementation specific messaging system and the `LLMMessage` abstraction.
+the implementation specific messaging system and the `LanguageModelMessage` abstraction.
 */
 func LLMMessagesFromGPT(input []*ltypes.GPTCompletionMessage) []*LanguageModelMessage {
 	resp := make([]*LanguageModelMessage, 0)
@@ -133,9 +133,9 @@ func LLMMessagesToGPT(messages []*LanguageModelMessage) []*ltypes.GPTCompletionM
 }
 
 /*
-Parses a list of `GemContent` into a list of `LLMMessage`. These methods should
+Parses a list of `GemContent` into a list of `LanguageModelMessage`. These methods should
 be used over manual converstion to ensure correct serialization and message parsing from
-the implementation specific messaging system and the `LLMMessage` abstraction.
+the implementation specific messaging system and the `LanguageModelMessage` abstraction.
 */
 func LLMMessagesFromGemini(messages []*ltypes.GemContent) []*LanguageModelMessage {
 	resp := make([]*LanguageModelMessage, 0)

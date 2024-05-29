@@ -14,8 +14,9 @@ type TokenRecord struct {
 }
 
 func NewTokenRecord(model string, input int, output int, total int) *TokenRecord {
+	id, _ := uuid.NewV7()
 	return &TokenRecord{
-		ID:           uuid.New(),
+		ID:           id,
 		Model:        model,
 		InputTokens:  input,
 		OutputTokens: output,
@@ -24,8 +25,9 @@ func NewTokenRecord(model string, input int, output int, total int) *TokenRecord
 }
 
 func NewTokenRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *TokenRecord {
+	id, _ := uuid.NewV7()
 	return &TokenRecord{
-		ID:           uuid.New(),
+		ID:           id,
 		Model:        model,
 		InputTokens:  usage.PromptTokens,
 		OutputTokens: usage.CompletionTokens,
@@ -34,8 +36,9 @@ func NewTokenRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *TokenReco
 }
 
 func NewTokenRecordFromAnthropicUsage(model string, usage *ltypes.AnthropicUsage) *TokenRecord {
+	id, _ := uuid.NewV7()
 	return &TokenRecord{
-		ID:           uuid.New(),
+		ID:           id,
 		Model:        model,
 		InputTokens:  usage.InputTokens,
 		OutputTokens: usage.OutputTokens,
