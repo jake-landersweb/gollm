@@ -20,8 +20,8 @@ func TestAnthropicTextCompletion(t *testing.T) {
 	raw = append(raw, NewUserMessage("Please respond with a single sentence."))
 	messages := LLMMessagesToAnthropic(raw)
 
-	llm := NewLanguageModel(test_user_id, logger, "", nil)
-	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude2, 0.5, false, "", messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, false, "", messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -44,8 +44,8 @@ func TestAnthropicJSONCompletion(t *testing.T) {
 
 	fmt.Println(*messages[0])
 
-	llm := NewLanguageModel(test_user_id, logger, "", nil)
-	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude2, 0.5, true, schema, messages)
+	llm := NewLanguageModel(test_user_id, logger, nil)
+	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, true, schema, messages)
 	assert.Nil(t, err)
 	if err != nil {
 		return

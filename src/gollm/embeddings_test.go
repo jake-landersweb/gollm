@@ -18,6 +18,6 @@ func TestOpenAIEmbeddings(t *testing.T) {
 	response, err := embeddings.Embed(ctx, input)
 	require.Nil(t, err)
 
-	require.Equal(t, 1, len(response))
-	require.Equal(t, 1, len(embeddings.GetTokenRecords()))
+	require.Equal(t, 1, len(response.Embeddings))
+	require.NotNil(t, response.Usage)
 }

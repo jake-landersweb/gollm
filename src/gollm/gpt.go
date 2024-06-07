@@ -70,7 +70,7 @@ func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, 
 	backoff := 1 * time.Second
 
 	for attempt := 0; attempt < retries; attempt++ {
-		logger.InfoContext(ctx, "Sending Request...")
+		logger.InfoContext(ctx, "Sending GPT request...")
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("there was an unknown issue with the request: %v", err)

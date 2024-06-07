@@ -13,17 +13,39 @@ type LanguageModel struct {
 	userId string
 	logger *slog.Logger
 	args   *NewLanguageModelArgs
-
-	conversation []*LanguageModelMessage
-	tokenRecords []*tokens.TokenRecord
 }
 
 type CompletionInput struct {
+	Model        string
+	Temperature  float64
+	Json         bool
+	JsonSchema   string
+	Conversation []*LanguageModelMessage
+	// Tools []
+}
+
+// Valiate the completion input
+func (input *CompletionInput) Validate() error {
+	if input.Model == "" {
+		return fmt.Errorf("`Model` cannot be empty")
+	}
+	if input.Json && input.JsonSchema == "" {
+		return fmt.Errorf("if `Json` is true, then `JsonSchema` cannot be empty")
+	}
+	if len(input.Conversation) == 0 {
+		return fmt.Errorf("the conversation cannot be empty")
+	}
+	if !(input.Conversation[len(input.Conversation)-1].Role == RoleUser) {
+		return fmt.Errorf("the last message must be a user message")
+	}
+	return nil
+}
+
+type CompletionResponse struct {
 	Model       string
-	Temperature float64
-	Json        bool
-	JsonSchema  string
-	Input       string
+	StopReason  string
+	Message     *LanguageModelMessage
+	UsageRecord *tokens.TokenRecord
 }
 
 type NewLanguageModelArgs struct {
@@ -72,54 +94,15 @@ func parseArguments(args *NewLanguageModelArgs) *NewLanguageModelArgs {
 func NewLanguageModel(
 	userId string,
 	logger *slog.Logger,
-	sysMessage string,
 	args *NewLanguageModelArgs,
 ) *LanguageModel {
 	args = parseArguments(args)
 
-	if sysMessage == "" {
-		sysMessage = default_system_message
-	}
-
-	// initialize the conversation
-	conversation := make([]*LanguageModelMessage, 0)
-	conversation = append(conversation, NewSystemMessage(sysMessage))
-
 	return &LanguageModel{
-		userId:       userId,
-		logger:       logger,
-		args:         args,
-		conversation: conversation,
-		tokenRecords: make([]*tokens.TokenRecord, 0),
+		userId: userId,
+		logger: logger,
+		args:   args,
 	}
-}
-
-// Create a new language model that inherets from a previous conversation
-func NewLanguageModelFromConversation(
-	userId string,
-	logger *slog.Logger,
-	conversation []*LanguageModelMessage,
-	args *NewLanguageModelArgs,
-) *LanguageModel {
-	args = parseArguments(args)
-
-	if conversation == nil {
-		// initialize the conversation
-		conversation = make([]*LanguageModelMessage, 0)
-		conversation = append(conversation, NewSystemMessage(default_system_message))
-	}
-
-	return &LanguageModel{
-		userId:       userId,
-		logger:       logger,
-		args:         args,
-		conversation: conversation,
-		tokenRecords: make([]*tokens.TokenRecord, 0),
-	}
-}
-
-func (l *LanguageModel) GetConversation() []*LanguageModelMessage {
-	return l.conversation
 }
 
 /*
@@ -129,156 +112,153 @@ on what model you are using:
 - GPT3/4: Rough approximation, but should NOT be used for billing reasons
 
 - Gemini: Uses the production tokenization endpoint, will be exact token counts.
-*/
-func (l *LanguageModel) TokenEstimate(input *CompletionInput) (int, error) {
-	if strings.HasPrefix(input.Model, "gpt") {
-		return gptTokenizerApproximate("avg", input.Input)
-	} else if strings.HasPrefix(input.Model, "gemini") {
-		return l.geminiTokenizerAccurate(input.Input, input.Model)
-	} else if strings.HasPrefix(input.Model, "claude") {
-		return anthropicTokenizerAproximate(input.Input), nil
-	} else {
-		return 0, fmt.Errorf("invalid model: %s", input.Model)
-	}
-}
 
-func (l *LanguageModel) PrintConversation() {
-	fmt.Println("\n\n --- LLM Conversation --- ")
-	for _, item := range l.conversation {
-		fmt.Println("[[", item.Role.ToString(), "]]")
-		fmt.Println(">", item.Message)
+- Anthropic: Uses approximate function, should NOT be used for billing reasons
+*/
+func TokenEstimate(model string, message string) (int, error) {
+	if strings.HasPrefix(model, "gpt") {
+		return gptTokenizerApproximate("avg", message)
+	} else if strings.HasPrefix(model, "gemini") {
+		return geminiTokenizerAccurate(message, model)
+	} else if strings.HasPrefix(model, "claude") {
+		return anthropicTokenizerAproximate(message), nil
+	} else {
+		return 0, fmt.Errorf("invalid model: %s", model)
 	}
 }
 
 // Uses the `Model` passed in the `input` to dynamically parse which completion method to use.
-// This should be the default method used in most cases, but the provider-specific functions
-// (i.e GPTCompletion) are available if needed.
-func (l *LanguageModel) DynamicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
+func (l *LanguageModel) Completion(ctx context.Context, input *CompletionInput) (*CompletionResponse, error) {
+	// parse the input
+	if input == nil {
+		return nil, fmt.Errorf("the input cannot be nil")
+	}
+	if err := input.Validate(); err != nil {
+		return nil, err
+	}
+
+	// create a copy of the conversation
+	conversation := make([]*LanguageModelMessage, len(input.Conversation))
+	copy(conversation, input.Conversation)
+
+	// check the token usage and trim the conversation if needed
+	// TODO --
+
 	if strings.HasPrefix(input.Model, "gpt") {
-		return l.GPTCompletion(ctx, input)
+		return l.gpt(ctx, input, conversation)
 	} else if strings.HasPrefix(input.Model, "gemini") {
-		return l.GeminiCompletion(ctx, input)
+		return l.gemini(ctx, input, conversation)
 	} else if strings.HasPrefix(input.Model, "claude") {
-		return l.AnthropicCompletion(ctx, input)
+		return l.anthropic(ctx, input, conversation)
 	} else {
-		return "", fmt.Errorf("invalid model type: %s", input.Model)
+		return nil, fmt.Errorf("invalid model type: %s", input.Model)
 	}
 }
 
 // Perform a completion specifically using OpenAI as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) GPTCompletion(ctx context.Context, input *CompletionInput) (string, error) {
-	if input == nil {
-		return "", fmt.Errorf("the input cannot be nil")
-	}
-	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
-	logger.InfoContext(ctx, "Beginning completion ...")
-
-	// add a new conversation record for the specified input
-	l.conversation = append(l.conversation, &LanguageModelMessage{
-		Role:    RoleUser,
-		Message: input.Input,
-	})
+func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
+	logger.InfoContext(ctx, "Beginning GPT completion ...")
 
 	// send the request
-	response, err := l.gptCompletion(ctx, logger, l.userId, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGPT(l.conversation))
+	response, err := l.gptCompletion(ctx, logger, l.userId, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGPT(conversation))
 	if err != nil {
-		// remove the message from the conversation
-		l.conversation = l.conversation[:len(l.conversation)-1]
-		return "", fmt.Errorf("there was an issue sending the request: %v", err)
+		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
 
 	// add the response message to the conversation
-	l.conversation = append(l.conversation, NewMessageFromGPT(&response.Choices[0].Message))
+	choice := &response.Choices[0]
 
-	// add the tokens to the internal counts
-	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecordFromGPTUsage(input.Model, &response.Usage))
+	// Create a token record for this request
+	tokenRecord := tokens.NewTokenRecordFromGPTUsage(input.Model, &response.Usage)
 
 	logger.InfoContext(ctx, "Completed GPT completion")
 	logger.DebugContext(ctx, "GPT completion stats", "response", response, "inTokens", response.Usage.PromptTokens, "outTokens", response.Usage.CompletionTokens, "totalTokens", response.Usage.TotalTokens)
 
 	// return the text string of the completion to let the caller parse as needed
-	return response.Choices[0].Message.Content, nil
+	return &CompletionResponse{
+		Model:       input.Model,
+		StopReason:  choice.FinishReason,
+		Message:     NewMessageFromGPT(&choice.Message),
+		UsageRecord: tokenRecord,
+	}, nil
 }
 
 // Perform a completion specifically using Google as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) GeminiCompletion(ctx context.Context, input *CompletionInput) (string, error) {
-	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
-	logger.InfoContext(ctx, "Beginning completion ...")
+func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
+	logger.InfoContext(ctx, "Beginning Gemini completion ...")
 
 	logger.DebugContext(ctx, "Calculating the input tokens ...")
-	inTokens, err := l.geminiTokenizerAccurate(input.Input, input.Model)
+	inTokens, err := geminiTokenizerAccurate(conversation[len(conversation)-1].Message, input.Model)
 	if err != nil {
-		return "", fmt.Errorf("there was an issue calculating the token usage: %v", err)
+		return nil, fmt.Errorf("there was an issue calculating the token usage: %v", err)
 	}
 	logger.DebugContext(ctx, "Got input tokens", "tokens", inTokens)
 
-	l.conversation = append(l.conversation, &LanguageModelMessage{
-		Role:    RoleUser,
-		Message: input.Input,
-	})
-
 	// send the request
-	response, err := l.geminiCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGemini(l.conversation))
+	response, err := l.geminiCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGemini(conversation))
 	if err != nil {
-		// remove the message from the conversation
-		l.conversation = l.conversation[:len(l.conversation)-1]
-		return "", fmt.Errorf("there was an issue sending the request: %v", err)
+		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
 
 	logger.DebugContext(ctx, "Calculating the output tokens ...")
-	outTokens, err := l.geminiTokenizerAccurate(response.Candidates[0].Content.Parts[0].Text, input.Model)
+	outTokens, err := geminiTokenizerAccurate(response.Candidates[0].Content.Parts[0].Text, input.Model)
 	if err != nil {
-		return "", fmt.Errorf("there was an issue calculating the token usage for this api call: %v", err)
+		return nil, fmt.Errorf("there was an issue calculating the token usage for this api call: %v", err)
 	}
 	logger.DebugContext(ctx, "Got output tokens", "tokens", outTokens)
 
 	// add the conversation record
-	l.conversation = append(l.conversation, NewMessageFromGemini(&response.Candidates[0].Content))
+	candidate := &response.Candidates[0]
 
 	// add the parsed tokens
-	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecord(input.Model, inTokens, outTokens, inTokens+outTokens))
+	tokenRecord := tokens.NewTokenRecord(input.Model, inTokens, outTokens, inTokens+outTokens)
 
 	logger.InfoContext(ctx, "Completed Gemini completion")
 	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
 
-	return response.Candidates[0].Content.Parts[0].Text, nil
+	return &CompletionResponse{
+		Model:       input.Model,
+		StopReason:  candidate.FinishReason,
+		Message:     NewMessageFromGemini(&candidate.Content),
+		UsageRecord: tokenRecord,
+	}, nil
 }
 
 // Perform a completion specifically using Anthropic as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) AnthropicCompletion(ctx context.Context, input *CompletionInput) (string, error) {
-	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema, "input", input.Input)
-	logger.InfoContext(ctx, "Beginning completion ...")
-
-	// add a new conversation record for the specified input
-	l.conversation = append(l.conversation, &LanguageModelMessage{
-		Role:    RoleUser,
-		Message: input.Input,
-	})
+func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
+	logger.InfoContext(ctx, "Beginning Anthropic completion ...")
 
 	// send the request
-	response, err := l.anthropicCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToAnthropic(l.conversation))
+	response, err := l.anthropicCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToAnthropic(conversation))
 	if err != nil {
-		// remove the message from the conversation
-		l.conversation = l.conversation[:len(l.conversation)-1]
-		return "", fmt.Errorf("there was an issue sending the request: %v", err)
+		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
 
-	// add the response message to the conversation
-	l.conversation = append(l.conversation, NewMessageFromAnthropic(response.Content[0]))
-
 	// add the tokens to the internal counts
-	l.tokenRecords = append(l.tokenRecords, tokens.NewTokenRecordFromAnthropicUsage(input.Model, response.Usage))
+	tokenRecord := tokens.NewTokenRecordFromAnthropicUsage(input.Model, response.Usage)
 
-	logger.InfoContext(ctx, "Completed GPT completion")
-	logger.DebugContext(ctx, "GPT completion stats", "response", response, "inTokens", response.Usage.InputTokens, "outTokens", response.Usage.OutputTokens, "totalTokens", response.Usage.InputTokens+response.Usage.OutputTokens)
+	logger.InfoContext(ctx, "Completed Anthropic completion")
+	logger.DebugContext(ctx, "Anthropic completion stats", "response", response, "inTokens", response.Usage.InputTokens, "outTokens", response.Usage.OutputTokens, "totalTokens", response.Usage.InputTokens+response.Usage.OutputTokens)
 
 	// return the text string of the completion to let the caller parse as needed
-	return response.Content[0].Text, nil
+	return &CompletionResponse{
+		Model:       input.Model,
+		StopReason:  response.StopReason,
+		Message:     NewMessageFromAnthropic(response.Content[0]),
+		UsageRecord: tokenRecord,
+	}, nil
 }
 
-func (l *LanguageModel) GetTokenRecords() []*tokens.TokenRecord {
-	return l.tokenRecords
+func PrintConversation(conversation []*LanguageModelMessage) {
+	fmt.Println("\n\n --- LLM Conversation --- ")
+	for _, item := range conversation {
+		fmt.Println("[[", item.Role.ToString(), "]]")
+		fmt.Println(">", item.Message)
+	}
 }

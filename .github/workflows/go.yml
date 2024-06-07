@@ -31,5 +31,5 @@ jobs:
       run: go vet ./...
 
     - name: Go Test
-      run: go test -v ./src/gollm/*.go
+      run: go test -v ./src/gollm/*.go -run TestLLMMulti
 

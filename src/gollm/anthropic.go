@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"log/slog"
@@ -52,9 +53,10 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 		logger.DebugContext(ctx, "Running with json mode ENABLED")
 
 		// add json instructions onto the end of the request
-		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease respond to this message ONLY with the given json schema inside the <schema> tag.\n\n<schema>\n%s\n</schema>", comprequest.Messages[len(comprequest.Messages)-1].Content, jsonSchema)
+		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease place your RAW json output inside the <response></response> xml tags, following this schema: %s. You are to place any comments about the request inside the <comments></comments> tags. These comments should be limited to a single sentence, with most of your response being dedicated to the JSON RESPONSE.", comprequest.Messages[len(comprequest.Messages)-1].Content, jsonSchema)
 	} else {
 		logger.DebugContext(ctx, "Running with json mode DISABLED")
+		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease format your response inside the <response></response> xml tags. You are to respond to this request with NO additional comments or insights, and ONLY respond with the mentioned xml tags.", comprequest.Messages[len(comprequest.Messages)-1].Content)
 	}
 
 	// parse and encode the body
@@ -76,7 +78,7 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 	backoff := 1 * time.Second
 
 	for attempt := 0; attempt < retries; attempt++ {
-		logger.InfoContext(ctx, "Sending Request...")
+		logger.InfoContext(ctx, "Sending Anthropic request...")
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
@@ -101,6 +103,22 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 
 		// if no error, return
 		if response.Error == nil {
+			// parse the xml response
+			response.Content[0].Text = fmt.Sprintf("<root>%s</root>", response.Content[0].Text)
+			type rtag struct {
+				Content string `xml:",innerxml"`
+			}
+
+			type root struct {
+				Comments rtag `xml:"comments"`
+				Response rtag `xml:"response"`
+			}
+
+			var tmp root
+			if err := xml.Unmarshal([]byte(response.Content[0].Text), &tmp); err != nil {
+				return nil, fmt.Errorf("failed to parse the xml: %s", err)
+			}
+			response.Content[0].Text = tmp.Response.Content
 			return &response, nil
 		}
 

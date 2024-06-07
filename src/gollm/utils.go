@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"math"
 	"os"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -14,7 +13,7 @@ func defaultLogger(level slog.Leveler) *slog.Logger {
 
 // Chunks string `s` into a list if strings into equal lengths with a max size of `n`
 // If the string is not divisible by n, then the items will be as close in length as possible
-func chunkStringEqualUntilN(s string, n int) []string {
+func ChunkStringEqualUntilN(s string, n int) []string {
 	if len(s) == 0 || n <= 0 {
 		return []string{}
 	}
@@ -54,10 +53,4 @@ func convertSlice[T any, U any](list []T, convert func(T) U) []U {
 		result[i] = convert(v)
 	}
 	return result
-}
-
-func cleanForJson(input string) string {
-	input = strings.ReplaceAll(input, "```json", "")
-	input = strings.ReplaceAll(input, "```", "")
-	return input
 }

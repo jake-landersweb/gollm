@@ -22,9 +22,6 @@ type OpenAIEmbeddings struct {
 	userId string
 	logger *slog.Logger
 	opts   *OpenAIEmbeddingsOpts
-
-	// track token usage
-	tokenRecords []*tokens.TokenRecord
 }
 
 // Optional configurations to customize the usage of the model.
@@ -38,7 +35,7 @@ type OpenAIEmbeddingsOpts struct {
 	// Function to use when splitting the text into sections that will fit into the context window.
 	// If null, the text will be split into equal-sized sections. `s` is the raw string, `n` is the max
 	// length the chunks can be. Must return a list of strings that where each len(string) <= n
-	ChunkingFunction ChunkingFunction
+	ChunkingFunction func(s string, n int) []string
 
 	// Optionally pass in an api key. If not specified, the environment variable `OPENAI_API_KEY` will be read.
 	OpenAIApiKey string
@@ -64,7 +61,7 @@ func NewOpenAIEmbeddings(userId string, logger *slog.Logger, opts *OpenAIEmbeddi
 		opts.BaseUrl = openai_embeddings_base_url
 	}
 	if opts.ChunkingFunction == nil {
-		opts.ChunkingFunction = chunkStringEqualUntilN
+		opts.ChunkingFunction = ChunkStringEqualUntilN
 	}
 
 	return &OpenAIEmbeddings{
@@ -74,11 +71,12 @@ func NewOpenAIEmbeddings(userId string, logger *slog.Logger, opts *OpenAIEmbeddi
 	}
 }
 
-func (e *OpenAIEmbeddings) GetTokenRecords() []*tokens.TokenRecord {
-	return e.tokenRecords
+type EmbedResponse struct {
+	Embeddings []*ltypes.EmbeddingsData
+	Usage      *tokens.TokenRecord
 }
 
-func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) ([]*ltypes.EmbeddingsData, error) {
+func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedResponse, error) {
 	// chunk the input
 	if input == "" {
 		return nil, fmt.Errorf("the input cannot be empty")
@@ -90,7 +88,7 @@ func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) ([]*ltypes.E
 	}
 
 	// track token usage
-	e.tokenRecords = append(e.tokenRecords, tokens.NewTokenRecordFromGPTUsage(e.opts.Model, &response.Usage))
+	tokenRecord := tokens.NewTokenRecordFromGPTUsage(e.opts.Model, &response.Usage)
 
 	// convert openai response into pgvector data types
 	list := make([]*ltypes.EmbeddingsData, 0)
@@ -101,7 +99,10 @@ func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) ([]*ltypes.E
 		})
 	}
 
-	return list, nil
+	return &EmbedResponse{
+		Embeddings: list,
+		Usage:      tokenRecord,
+	}, nil
 }
 
 func (e *OpenAIEmbeddings) openAIEmbed(ctx context.Context, input []string) (*ltypes.OpenAIEmbeddingResponse, error) {

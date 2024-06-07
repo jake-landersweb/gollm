@@ -82,7 +82,7 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 	backoff := 1 * time.Second
 
 	for attempt := 0; attempt < retries; attempt++ {
-		logger.InfoContext(ctx, "Sending Request...")
+		logger.InfoContext(ctx, "Sending Gemini request...")
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
@@ -153,13 +153,10 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 	return nil, err
 }
 
-func (l *LanguageModel) geminiTokenizerAccurate(input string, model string) (int, error) {
-	apiKey := l.args.GeminiApiKey
-	if apiKey == "" {
-		apiKey = os.Getenv("GEMINI_API_KEY")
-		if apiKey == "" || apiKey == "null" {
-			return 0, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
-		}
+func geminiTokenizerAccurate(input string, model string) (int, error) {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" || apiKey == "null" {
+		return 0, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
 	}
 
 	// create the body
@@ -180,7 +177,7 @@ func (l *LanguageModel) geminiTokenizerAccurate(input string, model string) (int
 	}
 
 	// create the request
-	url := fmt.Sprintf("%s/%s:countTokens?key=%s", l.args.GeminiBaseUrl, model, apiKey)
+	url := fmt.Sprintf("%s/%s:countTokens?key=%s", gemini_base_url, model, apiKey)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(enc))
 	if err != nil {
 		return 0, fmt.Errorf("error creating request: %v", err)

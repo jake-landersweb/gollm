@@ -31,8 +31,10 @@ func (r LanguageModelRole) ToString() string {
 type LanguageModelMessage struct {
 	Role    LanguageModelRole `json:"role"`
 	Message string            `json:"message"`
+	Tokens  int               `json:"tokens"`
 }
 
+// Creates a new system message
 func NewSystemMessage(input string) *LanguageModelMessage {
 	return &LanguageModelMessage{
 		Role:    RoleSystem,
@@ -40,11 +42,20 @@ func NewSystemMessage(input string) *LanguageModelMessage {
 	}
 }
 
+// Creates a new user message
 func NewUserMessage(input string) *LanguageModelMessage {
 	return &LanguageModelMessage{
 		Role:    RoleUser,
 		Message: input,
 	}
+}
+
+// Creates a new conversation from a system message, and returns the
+// list with the system message embedded as the first element
+func NewConversation(sysMessage string) []*LanguageModelMessage {
+	conversation := make([]*LanguageModelMessage, 0)
+	conversation = append(conversation, NewSystemMessage(sysMessage))
+	return conversation
 }
 
 // Creates a new `LLMMessage` from an input `GPTCompletionMessage`
