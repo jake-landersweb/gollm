@@ -218,6 +218,7 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 		input.Json,
 		input.JsonSchema,
 		MessagesToGemini(conversation),
+		ToolsToGemini(input.Tools),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)

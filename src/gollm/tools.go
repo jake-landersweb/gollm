@@ -55,7 +55,7 @@ func ToolsToGemini(tools []*Tool) []*ltypes.GemTool {
 		funcs[i] = item.ToGemini()
 	}
 
-	resp := make([]*ltypes.GemTool, 1)
+	resp := make([]*ltypes.GemTool, 0)
 	obj := &ltypes.GemTool{
 		FunctionDeclarations: funcs,
 	}

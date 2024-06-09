@@ -1,9 +1,7 @@
 package gollm
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/google/uuid"
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
@@ -152,16 +150,11 @@ to convert a list of `GemContent` messages, as you should use `LLMMessagesFromGe
 ensure the system message is parsed correctly
 */
 func NewMessageFromGemini(input *ltypes.GemContent) *Message {
-	msg := &Message{
-		Message: input.Parts[0].Text,
-	}
-	switch input.Role {
-	case "model":
-		msg.Role = RoleAI
-	default:
-		msg.Role = RoleUser
-	}
-	return msg
+	// return the message parsed from the response, as it will never be a user message,
+	// which would trigger an index fault
+	return MessagesFromGemini([]*ltypes.GemContent{
+		input,
+	})[0]
 }
 
 /*
@@ -233,30 +226,25 @@ func MessagesFromGemini(messages []*ltypes.GemContent) []*Message {
 	resp := make([]*Message, 0)
 
 	// loop over messages and perform parsing
-	for _, item := range messages {
-
-		// check for system message
-		if strings.HasPrefix(item.Parts[0].Text, gemini_system_message) {
-			// split into two messages
-			parsed := strings.Split(item.Parts[0].Text, "\n\n")
-			// remove the system message from the first parsed message
-			sys := strings.ReplaceAll(parsed[0], fmt.Sprintf("%s: ", gemini_system_message), "")
-			// add the system message
-			resp = append(resp, NewSystemMessage(sys))
-			// add the user message
-			resp = append(resp, NewUserMessage(parsed[1]))
-		} else {
-			// basic message
-			msg := &Message{
-				Message: item.Parts[0].Text,
+	for index, item := range messages {
+		switch item.Role {
+		case "system":
+			resp = append(resp, NewSystemMessage(item.Parts[0].Text))
+		case "model":
+			// parse a function call if there was one
+			if item.Parts[0].FunctionCall != nil {
+				resp = append(resp, NewToolCallMessage(uuid.New().String(), item.Parts[0].FunctionCall.Name, item.Parts[0].FunctionCall.Args, ""))
+			} else {
+				resp = append(resp, NewAssistantMessage(item.Parts[0].Text))
 			}
-			switch item.Role {
-			case "model":
-				msg.Role = RoleAI
-			default:
-				msg.Role = RoleUser
+		default:
+			if item.Parts[0].FunctionResponse != nil {
+				// parse the tool use id from the previous messages
+				toolUseId := resp[index-1].ToolUseID
+				resp = append(resp, NewToolResultMessage(toolUseId, item.Parts[0].FunctionResponse.Name, item.Parts[0].FunctionResponse.Response["function_response"].(string)))
+			} else {
+				resp = append(resp, NewUserMessage(item.Parts[0].Text))
 			}
-			resp = append(resp, msg)
 		}
 	}
 
@@ -267,35 +255,41 @@ func MessagesToGemini(messages []*Message) []*ltypes.GemContent {
 	resp := make([]*ltypes.GemContent, 0)
 
 	for _, item := range messages {
-		var role string
-		message := item.Message
-
 		switch item.Role {
-		case RoleSystem:
-			// create a custom message as there is not a 'system' message in gemini
-			role = "user"
-			message = fmt.Sprintf("%s: %s", gemini_system_message, item.Message)
 		case RoleAI:
-			role = "model"
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "model",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
+			})
+		case RoleSystem:
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "system",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
+			})
+		case RoleToolCall:
+			resp = append(resp, &ltypes.GemContent{
+				Role: "model",
+				Parts: []ltypes.GemPart{{FunctionCall: &ltypes.GemFunctionCall{
+					Name: item.ToolName,
+					Args: item.ToolArguments,
+				}}},
+			})
+		case RoleToolResult:
+			resp = append(resp, &ltypes.GemContent{
+				Role: "user",
+				Parts: []ltypes.GemPart{{FunctionResponse: &ltypes.GemFunctionResponse{
+					Name: item.ToolName,
+					Response: map[string]any{
+						"function_response": item.Message,
+					},
+				}}},
+			})
 		default:
-			if len(resp) == 1 && messages[0].Role == RoleSystem {
-				// append to the first user message as there is no system message in gemini
-				resp[0].Parts[0].Text = fmt.Sprintf("%s\n\n%s", resp[0].Parts[0].Text, item.Message)
-				continue
-			} else {
-				role = "user"
-			}
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "user",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
+			})
 		}
-
-		// if got here, normal append
-		resp = append(resp, &ltypes.GemContent{
-			Role: role,
-			Parts: []ltypes.GemPart{
-				{
-					Text: message,
-				},
-			},
-		})
 	}
 
 	return resp
