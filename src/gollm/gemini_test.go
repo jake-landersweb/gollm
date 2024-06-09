@@ -25,10 +25,10 @@ func TestGeminiTextCompletion(t *testing.T) {
 	ctx := context.Background()
 
 	// make the messages
-	raw := make([]*LanguageModelMessage, 0)
+	raw := make([]*Message, 0)
 	raw = append(raw, NewSystemMessage("You are a model that is being used to validate that method calls to your api work in a go testing environment."))
 	raw = append(raw, NewUserMessage("Please respond with a single sentence."))
-	messages := LLMMessagesToGemini(raw)
+	messages := MessagesToGemini(raw)
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
 	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, false, "", messages)
@@ -47,10 +47,10 @@ func TestGeminiJSONCompletion(t *testing.T) {
 	schema := `{"message": string, "date": int}`
 
 	// make the messages
-	raw := make([]*LanguageModelMessage, 0)
+	raw := make([]*Message, 0)
 	raw = append(raw, NewSystemMessage("You are a model that is being used to validate that method calls to your api work in a go testing environment."))
 	raw = append(raw, NewUserMessage("Please respond with a reasonable response."))
-	messages := LLMMessagesToGemini(raw)
+	messages := MessagesToGemini(raw)
 
 	fmt.Println(*messages[0])
 

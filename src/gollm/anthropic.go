@@ -16,7 +16,16 @@ import (
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
-func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.AnthropicMessage) (*ltypes.AnthropicResponse, error) {
+func (l *LanguageModel) anthropicCompletion(
+	ctx context.Context,
+	logger *slog.Logger,
+	model string,
+	temperature float64,
+	jsonMode bool,
+	jsonSchema string,
+	messages []*ltypes.AnthropicMessage,
+	tools []*ltypes.AnthropicTool,
+) (*ltypes.AnthropicResponse, error) {
 	apiKey := l.args.AnthropicApiKey
 	if apiKey == "" {
 		apiKey = os.Getenv("ANTHROPIC_API_KEY")
@@ -29,7 +38,7 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 	var msgs []*ltypes.AnthropicMessage
 	systemMsg := ""
 	if messages[0].Role == "system" {
-		systemMsg = messages[0].Content
+		systemMsg = messages[0].Content[0].Text
 		msgs = messages[1:] // trim off the first message
 	} else {
 		msgs = messages
@@ -42,21 +51,24 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 		System:      systemMsg,
 		MaxTokens:   l.args.AnthropicMaxTokens,
 		Temperature: temperature,
+		Tools:       tools,
 	}
 
-	// add instructions for json mode
-	if jsonMode {
-		if jsonSchema == "" {
-			return nil, fmt.Errorf("invalid json schema provided")
+	// do not add any extra options for tool use
+	if messages[len(messages)-1].Content[0].Type != "tool_result" {
+		// add instructions for json mode
+		if jsonMode {
+			if jsonSchema == "" {
+				return nil, fmt.Errorf("invalid json schema provided")
+			}
+
+			logger.DebugContext(ctx, "Running with json mode ENABLED")
+
+			// add json instructions onto the end of the request
+			comprequest.Messages[len(comprequest.Messages)-1].Content[0].Text = fmt.Sprintf("%s\n\nPlease place your JSON output inside <json></json> xml tags, following this schema: %s", comprequest.Messages[len(comprequest.Messages)-1].Content[0].Text, jsonSchema)
+		} else {
+			logger.DebugContext(ctx, "Running with json mode DISABLED")
 		}
-
-		logger.DebugContext(ctx, "Running with json mode ENABLED")
-
-		// add json instructions onto the end of the request
-		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease place your RAW json output inside the <response></response> xml tags, following this schema: %s. You are to place any comments about the request inside the <comments></comments> tags. These comments should be limited to a single sentence, with most of your response being dedicated to the JSON RESPONSE.", comprequest.Messages[len(comprequest.Messages)-1].Content, jsonSchema)
-	} else {
-		logger.DebugContext(ctx, "Running with json mode DISABLED")
-		comprequest.Messages[len(comprequest.Messages)-1].Content = fmt.Sprintf("%s\n\nPlease format your response inside the <response></response> xml tags. You are to respond to this request with NO additional comments or insights, and ONLY respond with the mentioned xml tags.", comprequest.Messages[len(comprequest.Messages)-1].Content)
 	}
 
 	// parse and encode the body
@@ -103,6 +115,13 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 
 		// if no error, return
 		if response.Error == nil {
+			// if there are function calls, do not parse the response
+			if len(response.Content) > 1 || !jsonMode {
+				return &response, nil
+			}
+
+			logger.DebugContext(ctx, "Parsing json ...")
+
 			// parse the xml response
 			response.Content[0].Text = fmt.Sprintf("<root>%s</root>", response.Content[0].Text)
 			type rtag struct {
@@ -110,15 +129,14 @@ func (l *LanguageModel) anthropicCompletion(ctx context.Context, logger *slog.Lo
 			}
 
 			type root struct {
-				Comments rtag `xml:"comments"`
-				Response rtag `xml:"response"`
+				Json rtag `xml:"json"`
 			}
 
 			var tmp root
 			if err := xml.Unmarshal([]byte(response.Content[0].Text), &tmp); err != nil {
 				return nil, fmt.Errorf("failed to parse the xml: %s", err)
 			}
-			response.Content[0].Text = tmp.Response.Content
+			response.Content[0].Text = tmp.Json.Content
 			return &response, nil
 		}
 

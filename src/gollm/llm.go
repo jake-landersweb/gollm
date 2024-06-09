@@ -20,7 +20,8 @@ type CompletionInput struct {
 	Temperature  float64
 	Json         bool
 	JsonSchema   string
-	Conversation []*LanguageModelMessage
+	Conversation []*Message
+	Tools        []*Tool
 	// Tools []
 }
 
@@ -35,8 +36,8 @@ func (input *CompletionInput) Validate() error {
 	if len(input.Conversation) == 0 {
 		return fmt.Errorf("the conversation cannot be empty")
 	}
-	if !(input.Conversation[len(input.Conversation)-1].Role == RoleUser) {
-		return fmt.Errorf("the last message must be a user message")
+	if input.Conversation[len(input.Conversation)-1].Role == RoleAI || input.Conversation[len(input.Conversation)-1].Role == RoleSystem {
+		return fmt.Errorf("the last message cannot be an ai message or a system message")
 	}
 	return nil
 }
@@ -44,7 +45,7 @@ func (input *CompletionInput) Validate() error {
 type CompletionResponse struct {
 	Model       string
 	StopReason  string
-	Message     *LanguageModelMessage
+	Message     *Message
 	UsageRecord *tokens.TokenRecord
 }
 
@@ -138,7 +139,7 @@ func (l *LanguageModel) Completion(ctx context.Context, input *CompletionInput) 
 	}
 
 	// create a copy of the conversation
-	conversation := make([]*LanguageModelMessage, len(input.Conversation))
+	conversation := make([]*Message, len(input.Conversation))
 	copy(conversation, input.Conversation)
 
 	// check the token usage and trim the conversation if needed
@@ -157,12 +158,22 @@ func (l *LanguageModel) Completion(ctx context.Context, input *CompletionInput) 
 
 // Perform a completion specifically using OpenAI as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, conversation []*Message) (*CompletionResponse, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning GPT completion ...")
 
 	// send the request
-	response, err := l.gptCompletion(ctx, logger, l.userId, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGPT(conversation))
+	response, err := l.gptCompletion(
+		ctx,
+		logger,
+		l.userId,
+		input.Model,
+		input.Temperature,
+		input.Json,
+		input.JsonSchema,
+		MessagesToOpenAI(conversation),
+		ToolsToOpenAI(input.Tools),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
@@ -180,14 +191,14 @@ func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, convers
 	return &CompletionResponse{
 		Model:       input.Model,
 		StopReason:  choice.FinishReason,
-		Message:     NewMessageFromGPT(&choice.Message),
+		Message:     NewMessageFromOpenAI(&choice.Message),
 		UsageRecord: tokenRecord,
 	}, nil
 }
 
 // Perform a completion specifically using Google as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conversation []*Message) (*CompletionResponse, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning Gemini completion ...")
 
@@ -199,7 +210,15 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 	logger.DebugContext(ctx, "Got input tokens", "tokens", inTokens)
 
 	// send the request
-	response, err := l.geminiCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToGemini(conversation))
+	response, err := l.geminiCompletion(
+		ctx,
+		logger,
+		input.Model,
+		input.Temperature,
+		input.Json,
+		input.JsonSchema,
+		MessagesToGemini(conversation),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
@@ -230,12 +249,21 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 
 // Perform a completion specifically using Anthropic as the provider.
 // To be used only when wanting a direct gpt completion. Otherwise, use `DynamicCompletion`.
-func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, conversation []*LanguageModelMessage) (*CompletionResponse, error) {
+func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, conversation []*Message) (*CompletionResponse, error) {
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning Anthropic completion ...")
 
 	// send the request
-	response, err := l.anthropicCompletion(ctx, logger, input.Model, input.Temperature, input.Json, input.JsonSchema, LLMMessagesToAnthropic(conversation))
+	response, err := l.anthropicCompletion(
+		ctx,
+		logger,
+		input.Model,
+		input.Temperature,
+		input.Json,
+		input.JsonSchema,
+		MessagesToAnthropic(conversation),
+		ToolsToAnthropic(input.Tools),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
@@ -250,15 +278,36 @@ func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, c
 	return &CompletionResponse{
 		Model:       input.Model,
 		StopReason:  response.StopReason,
-		Message:     NewMessageFromAnthropic(response.Content[0]),
+		Message:     NewMessageFromAnthropic(response),
 		UsageRecord: tokenRecord,
 	}, nil
 }
 
-func PrintConversation(conversation []*LanguageModelMessage) {
+func PrintConversation(conversation []*Message) {
 	fmt.Println("\n\n --- LLM Conversation --- ")
 	for _, item := range conversation {
 		fmt.Println("[[", item.Role.ToString(), "]]")
-		fmt.Println(">", item.Message)
+		switch item.Role {
+		case RoleSystem:
+			fallthrough
+		case RoleAI:
+			fallthrough
+		case RoleUser:
+			fmt.Println(">", item.Message)
+		case RoleToolCall:
+			fmt.Printf("Tool Call ID: %s\n", item.ToolUseID)
+			// compose a function list
+			calls := ""
+			for k, v := range item.ToolArguments {
+				calls += fmt.Sprintf("%s: \"%s\", ", k, v)
+			}
+			calls = calls[:len(calls)-2]
+			fmt.Printf("%s(%s)\n", item.ToolName, calls)
+		case RoleToolResult:
+			fmt.Printf("Tool Call ID: %s\n", item.ToolUseID)
+			fmt.Printf("Tool Name: %s\n", item.ToolName)
+			fmt.Printf("Result: %s\n", item.Message)
+		}
+		fmt.Println("")
 	}
 }

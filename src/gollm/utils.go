@@ -1,6 +1,8 @@
 package gollm
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"math"
 	"os"
@@ -53,4 +55,9 @@ func convertSlice[T any, U any](list []T, convert func(T) U) []U {
 		result[i] = convert(v)
 	}
 	return result
+}
+
+func debugPrint(input any) {
+	enc, _ := json.MarshalIndent(input, "", "    ")
+	fmt.Println(string(enc))
 }

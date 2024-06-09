@@ -2,8 +2,8 @@ package ltypes
 
 // Message represents a single message in a conversation.
 type AnthropicMessage struct {
-	Role    string `json:"role"`    // "user" or "assistant"
-	Content string `json:"content"` // Can be a string or an array of content blocks
+	Role    string              `json:"role"`    // "user" or "assistant"
+	Content []*AnthropicContent `json:"content"` // Can be a string or an array of content blocks
 }
 
 // Metadata describes metadata about the request.
@@ -13,8 +13,9 @@ type AnthropicMetadata struct {
 
 // RequestConfig represents the configuration for a request to the model.
 type AnthropicRequest struct {
-	Model       string              `json:"model"`                 // The model version, e.g., "claude-2.1"
-	Messages    []*AnthropicMessage `json:"messages"`              // Array of input messages
+	Model       string              `json:"model"`    // The model version, e.g., "claude-2.1"
+	Messages    []*AnthropicMessage `json:"messages"` // Array of input messages
+	Tools       []*AnthropicTool    `json:"tools"`
 	System      string              `json:"system,omitempty"`      // System prompt, if any
 	MaxTokens   int                 `json:"max_tokens"`            // Maximum number of tokens to generate
 	Metadata    *AnthropicMetadata  `json:"metadata,omitempty"`    // Metadata about the request

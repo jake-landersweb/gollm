@@ -17,7 +17,17 @@ import (
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
-func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, userId string, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GPTCompletionMessage) (*ltypes.GPTCompletionResponse, error) {
+func (l *LanguageModel) gptCompletion(
+	ctx context.Context,
+	logger *slog.Logger,
+	userId string,
+	model string,
+	temperature float64,
+	jsonMode bool,
+	jsonSchema string,
+	messages []*ltypes.GPTCompletionMessage,
+	tools []*ltypes.GPTTool,
+) (*ltypes.GPTCompletionResponse, error) {
 	apiKey := l.args.OpenAIApiKey
 	if apiKey == "" {
 		apiKey = os.Getenv("OPENAI_API_KEY")
@@ -34,6 +44,11 @@ func (l *LanguageModel) gptCompletion(ctx context.Context, logger *slog.Logger, 
 		User:        userId,
 		N:           1,
 		Stream:      false,
+	}
+
+	// add the tools if necessary
+	if tools != nil {
+		comprequest.Tools = tools
 	}
 
 	if jsonMode {

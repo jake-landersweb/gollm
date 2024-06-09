@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -124,4 +125,64 @@ func TestLLMMulti(t *testing.T) {
 
 	PrintConversation(conversation)
 	require.Equal(t, 7, len(conversation))
+}
+
+func TestLLMToolUse(t *testing.T) {
+	logger := defaultLogger(slog.LevelDebug).With("test", "TestGPTToolUsage")
+	tools := make([]*Tool, 0)
+	tools = append(tools, &Tool{
+		Title:       "get_weather",
+		Description: "Gets the weather in celcius for the specified city.",
+		Schema: &ltypes.ToolSchema{
+			Type: "object",
+			Properties: map[string]*ltypes.ToolSchema{
+				"city_name": {
+					Type:        "string",
+					Description: "The name of a US city in the form of '<CITY>, <STATE_CODE>'. Such as 'Portland, OR'.",
+				},
+			},
+		},
+	})
+
+	// create an llm
+	llm := NewLanguageModel(test_user_id, logger, nil)
+
+	// function to get seeded message array
+	getMessages := func() []*Message {
+		messages := make([]*Message, 0)
+		messages = append(messages, NewSystemMessage("You are a model in a testing environment to test the implementation of tool use for language models. Act as normal."))
+		messages = append(messages, NewUserMessage("What is the weather in San Francisco today?"))
+		return messages
+	}
+
+	t.Run("ToolUse_OpenAI_Anthropic", func(t *testing.T) {
+		messages := getMessages()
+
+		// query openai for the tool request
+		response, err := llm.Completion(context.TODO(), &CompletionInput{
+			Model:        gpt3_model,
+			Temperature:  1.0,
+			Conversation: messages,
+			Tools:        tools,
+		})
+		require.NoError(t, err)
+		messages = append(messages, response.Message)
+		require.Equal(t, RoleToolCall, messages[len(messages)-1].Role)
+
+		// add a response to the tool use
+		messages = append(messages, NewToolResultMessage(messages[len(messages)-1].ToolUseID, messages[len(messages)-1].ToolName, "35 degrees"))
+
+		// send an anthropic response
+		response, err = llm.Completion(context.TODO(), &CompletionInput{
+			Model:        anthropic_claude3,
+			Temperature:  0.5,
+			Conversation: messages,
+			Tools:        tools,
+		})
+		require.NoError(t, err)
+		messages = append(messages, response.Message)
+		require.Equal(t, RoleAI, messages[len(messages)-1].Role)
+
+		PrintConversation(messages)
+	})
 }

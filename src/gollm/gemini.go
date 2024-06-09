@@ -26,7 +26,7 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 
 	comprequest := &ltypes.GemRequestBody{
 		Contents: messages,
-		GenerationConfig: ltypes.GemGenerationConfig{
+		GenerationConfig: &ltypes.GemGenerationConfig{
 			Temperature: temperature,
 		},
 		// ignore all safety settings

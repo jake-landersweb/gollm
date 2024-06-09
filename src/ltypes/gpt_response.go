@@ -68,5 +68,5 @@ type GPTError struct {
 	Message string         `json:"message"`
 	Type    GPT_ERROR_TYPE `json:"type"`
 	Param   string         `json:"param"`
-	Code    int            `json:"code"`
+	Code    string         `json:"code"`
 }

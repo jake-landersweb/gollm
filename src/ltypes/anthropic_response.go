@@ -14,8 +14,21 @@ type AnthropicResponse struct {
 
 // ContentBlock represents a block of content within a message.
 type AnthropicContent struct {
+	// NORMAL MESSAGES
+
 	Type string `json:"type"`
-	Text string `json:"text"`
+	Text string `json:"text,omitempty"`
+
+	// FOR TOOL USE
+
+	ID    string         `json:"id,omitempty"`
+	Name  string         `json:"name,omitempty"`
+	Input map[string]any `json:"input,omitempty"`
+
+	// FOR TOOL RESULT
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	Content   string `json:"content,omitempty"`
+	IsError   bool   `json:"is_error,omitempty"`
 }
 
 // Usage provides information on token usage for the request.
