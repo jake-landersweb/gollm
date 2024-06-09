@@ -2,9 +2,11 @@ package gollm
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"testing"
 
+	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -124,4 +126,70 @@ func TestLLMMulti(t *testing.T) {
 
 	PrintConversation(conversation)
 	require.Equal(t, 7, len(conversation))
+}
+
+func TestLLMToolUse(t *testing.T) {
+	logger := defaultLogger(slog.LevelDebug).With("test", "TestGPTToolUsage")
+	tools := make([]*Tool, 0)
+	tools = append(tools, &Tool{
+		Title:       "get_weather",
+		Description: "Gets the weather in celcius for the specified city.",
+		Schema: &ltypes.ToolSchema{
+			Type: "object",
+			Properties: map[string]*ltypes.ToolSchema{
+				"city_name": {
+					Type:        "string",
+					Description: "The name of a US city in the form of '<CITY>, <STATE_CODE>'. Such as 'Portland, OR'. Use this tool if the user requests the weather.",
+				},
+			},
+		},
+	})
+
+	// create an llm
+	llm := NewLanguageModel(test_user_id, logger, nil)
+
+	// function to get seeded message array
+	runCombo := func(model1 string, model2 string) {
+		messages := make([]*Message, 0)
+		messages = append(messages, NewSystemMessage("You are a model in a testing environment to test the implementation of tool use for language models. Act as normal."))
+		messages = append(messages, NewUserMessage("What is the weather in San Francisco today?"))
+
+		// query model1 for the tool request
+		response, err := llm.Completion(context.TODO(), &CompletionInput{
+			Model:        model1,
+			Temperature:  0.5,
+			Conversation: messages,
+			Tools:        tools,
+		})
+		require.NoError(t, err)
+		messages = append(messages, response.Message)
+		require.Equal(t, RoleToolCall, messages[len(messages)-1].Role)
+
+		// add a response to the tool use
+		messages = append(messages, NewToolResultMessage(messages[len(messages)-1].ToolUseID, messages[len(messages)-1].ToolName, "35 degrees"))
+
+		// send a response to model2
+		response, err = llm.Completion(context.TODO(), &CompletionInput{
+			Model:        model2,
+			Temperature:  0.5,
+			Conversation: messages,
+			Tools:        tools,
+		})
+		require.NoError(t, err)
+		messages = append(messages, response.Message)
+		require.Equal(t, RoleAI, messages[len(messages)-1].Role)
+
+		fmt.Printf("MODEL 1: %s\nMODEL 2:%s\n", model1, model2)
+		PrintConversation(messages)
+	}
+
+	t.Run("ToolUse_OpenAI_Anthropic", func(t *testing.T) {
+		runCombo(gpt3_model, anthropic_claude3)
+	})
+	t.Run("ToolUse_Gemini_OpenAI", func(t *testing.T) {
+		runCombo(gemini_model, gpt3_model)
+	})
+	t.Run("ToolUse_Anthropic_Gemini", func(t *testing.T) {
+		runCombo(anthropic_claude3, gemini_model)
+	})
 }

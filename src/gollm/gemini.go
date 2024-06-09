@@ -15,7 +15,16 @@ import (
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
-func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logger, model string, temperature float64, jsonMode bool, jsonSchema string, messages []*ltypes.GemContent) (*ltypes.GemCompletionResponse, error) {
+func (l *LanguageModel) geminiCompletion(
+	ctx context.Context,
+	logger *slog.Logger,
+	model string,
+	temperature float64,
+	jsonMode bool,
+	jsonSchema string,
+	messages []*ltypes.GemContent,
+	tools []*ltypes.GemTool,
+) (*ltypes.GemCompletionResponse, error) {
 	apiKey := l.args.GeminiApiKey
 	if apiKey == "" {
 		apiKey = os.Getenv("GEMINI_API_KEY")
@@ -24,9 +33,20 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 		}
 	}
 
+	// parse a system message if exists
+	var msgs []*ltypes.GemContent
+	var systemMsg *ltypes.GemContent
+	if messages[0].Role == "system" {
+		systemMsg = messages[0]
+		msgs = messages[1:] // trim off the first message
+	} else {
+		msgs = messages
+	}
+
 	comprequest := &ltypes.GemRequestBody{
-		Contents: messages,
-		GenerationConfig: ltypes.GemGenerationConfig{
+		Contents:          msgs,
+		SystemInstruction: systemMsg,
+		GenerationConfig: &ltypes.GemGenerationConfig{
 			Temperature: temperature,
 		},
 		// ignore all safety settings
@@ -48,6 +68,11 @@ func (l *LanguageModel) geminiCompletion(ctx context.Context, logger *slog.Logge
 				Threshold: ltypes.BlockOnlyHigh,
 			},
 		},
+	}
+
+	// add tools if applicable
+	if tools != nil {
+		comprequest.Tools = tools
 	}
 
 	// parse for json mode
@@ -209,7 +234,3 @@ func geminiTokenizerAccurate(input string, model string) (int, error) {
 
 	return body["totalTokens"], nil
 }
-
-// func (l *LanguageModel) getGoogleModels() {
-
-// }

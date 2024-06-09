@@ -6,8 +6,7 @@ const gpt_base_url = "https://api.openai.com/v1/chat/completions"
 const gpt3_model = "gpt-3.5-turbo"
 const gpt_max_tokens = 8096
 
-const gemini_base_url = "https://generativelanguage.googleapis.com/v1/models"
-const gemini_system_message = "This is the system message of the conversation, and should be used as a general reference for the entire conversation"
+const gemini_base_url = "https://generativelanguage.googleapis.com/v1beta/models"
 const gemini_model = "gemini-1.5-flash"
 
 const anthropic_base_url = "https://api.anthropic.com/v1/messages"

@@ -1,21 +1,21 @@
 package gollm
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/google/uuid"
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
-type LanguageModelRole int
+type Role int
 
 const (
-	RoleSystem LanguageModelRole = iota
+	RoleSystem Role = iota
 	RoleUser
 	RoleAI
+	RoleToolCall
+	RoleToolResult
 )
 
-func (r LanguageModelRole) ToString() string {
+func (r Role) ToString() string {
 	switch r {
 	case RoleSystem:
 		return "System"
@@ -23,51 +23,121 @@ func (r LanguageModelRole) ToString() string {
 		return "User"
 	case RoleAI:
 		return "Assistant"
+	case RoleToolCall:
+		return "Tool Call"
+	case RoleToolResult:
+		return "Tool Result"
 	default:
 		return "Unknown"
 	}
 }
 
-type LanguageModelMessage struct {
-	Role    LanguageModelRole `json:"role"`
-	Message string            `json:"message"`
-	Tokens  int               `json:"tokens"`
+type Message struct {
+	Role    Role   `json:"role"`    // Role of the message
+	Message string `json:"message"` // Plain text of the message
+
+	ToolUseID     string         `json:"id"`        // If applicable - ID of the tool call
+	ToolName      string         `json:"name"`      // If applicable - Name of the tool call
+	ToolArguments map[string]any `json:"arguments"` // If applicable - Argments of the tool call. This will only be set on the role: `RoleToolCall`
+}
+
+func (m *Message) GetToolCall() *ToolCall {
+	if m.ToolUseID == "" {
+		return nil
+	}
+	return &ToolCall{
+		ID:        m.ToolUseID,
+		Name:      m.ToolName,
+		Arguments: m.ToolArguments,
+	}
+}
+
+func (m *Message) SetToolCall(tc *ToolCall) {
+	m.ToolUseID = tc.ID
+	m.ToolName = tc.Name
+	m.ToolArguments = tc.Arguments
 }
 
 // Creates a new system message
-func NewSystemMessage(input string) *LanguageModelMessage {
-	return &LanguageModelMessage{
+func NewSystemMessage(input string) *Message {
+	return &Message{
 		Role:    RoleSystem,
 		Message: input,
 	}
 }
 
 // Creates a new user message
-func NewUserMessage(input string) *LanguageModelMessage {
-	return &LanguageModelMessage{
+func NewUserMessage(input string) *Message {
+	return &Message{
 		Role:    RoleUser,
 		Message: input,
 	}
 }
 
+// Creates a new assistant message
+func NewAssistantMessage(input string) *Message {
+	return &Message{
+		Role:    RoleAI,
+		Message: input,
+	}
+}
+
+func NewToolCallMessage(
+	id string,
+	name string,
+	arguments map[string]any,
+	message string,
+) *Message {
+	return &Message{
+		Role:          RoleToolCall,
+		Message:       message,
+		ToolUseID:     id,
+		ToolName:      name,
+		ToolArguments: arguments,
+	}
+}
+
+func NewToolResultMessage(
+	id string,
+	name string,
+	message string,
+) *Message {
+	return &Message{
+		Role:      RoleToolResult,
+		Message:   message,
+		ToolUseID: id,
+		ToolName:  name,
+	}
+}
+
 // Creates a new conversation from a system message, and returns the
 // list with the system message embedded as the first element
-func NewConversation(sysMessage string) []*LanguageModelMessage {
-	conversation := make([]*LanguageModelMessage, 0)
+func NewConversation(sysMessage string) []*Message {
+	conversation := make([]*Message, 0)
 	conversation = append(conversation, NewSystemMessage(sysMessage))
 	return conversation
 }
 
 // Creates a new `LLMMessage` from an input `GPTCompletionMessage`
-func NewMessageFromGPT(input *ltypes.GPTCompletionMessage) *LanguageModelMessage {
-	msg := &LanguageModelMessage{
+func NewMessageFromOpenAI(input *ltypes.GPTCompletionMessage) *Message {
+	msg := &Message{
 		Message: input.Content,
 	}
 	switch input.Role {
 	case "system":
 		msg.Role = RoleSystem
 	case "assistant":
-		msg.Role = RoleAI
+		// parse if there was a tool call
+		if input.ToolCalls != nil && len(input.ToolCalls) != 0 {
+			msg.SetToolCall(ToolCallFromOpenAI(input.ToolCalls))
+			msg.Role = RoleToolCall
+		} else {
+			msg.Role = RoleAI
+		}
+	case "tool":
+		msg.Role = RoleToolResult
+		msg.ToolUseID = input.ToolCallId
+		msg.ToolName = input.Name
 	default:
 		msg.Role = RoleUser
 	}
@@ -79,17 +149,12 @@ For parsing the response of the gemini api into an `LanguageModelMessage`. This 
 to convert a list of `GemContent` messages, as you should use `LLMMessagesFromGemini` to
 ensure the system message is parsed correctly
 */
-func NewMessageFromGemini(input *ltypes.GemContent) *LanguageModelMessage {
-	msg := &LanguageModelMessage{
-		Message: input.Parts[0].Text,
-	}
-	switch input.Role {
-	case "model":
-		msg.Role = RoleAI
-	default:
-		msg.Role = RoleUser
-	}
-	return msg
+func NewMessageFromGemini(input *ltypes.GemContent) *Message {
+	// return the message parsed from the response, as it will never be a user message,
+	// which would trigger an index fault
+	return MessagesFromGemini([]*ltypes.GemContent{
+		input,
+	})[0]
 }
 
 /*
@@ -97,11 +162,15 @@ Parses an `AnthropicContent` into an `LanguageModelMessage`.
 This function should only be used to parse the response from the Anthropic API, as it
 does not take into account different roles and message types.
 */
-func NewMessageFromAnthropic(input *ltypes.AnthropicContent) *LanguageModelMessage {
-	return &LanguageModelMessage{
-		Role:    RoleAI,
-		Message: input.Text,
-	}
+func NewMessageFromAnthropic(input *ltypes.AnthropicResponse) *Message {
+	// need to parse the anthropic messages using the messages parser
+	msgs := make([]*ltypes.AnthropicMessage, 0)
+	msgs = append(msgs, &ltypes.AnthropicMessage{
+		Role:    input.Role,
+		Content: input.Content,
+	})
+	// only one message will be parsed here
+	return MessagesFromAnthropic(msgs)[0]
 }
 
 /*
@@ -109,35 +178,40 @@ Parses a list of `GPTCompletionMessage` into a list of `LanguageModelMessage`. T
 be used over manual converstion to ensure correct serialization and message parsing from
 the implementation specific messaging system and the `LanguageModelMessage` abstraction.
 */
-func LLMMessagesFromGPT(input []*ltypes.GPTCompletionMessage) []*LanguageModelMessage {
-	resp := make([]*LanguageModelMessage, 0)
+func MessagesFromOpenAI(input []*ltypes.GPTCompletionMessage) []*Message {
+	resp := make([]*Message, 0)
 
 	for _, item := range input {
-		resp = append(resp, NewMessageFromGPT(item))
+		resp = append(resp, NewMessageFromOpenAI(item))
 	}
 
 	return resp
 }
 
-func LLMMessagesToGPT(messages []*LanguageModelMessage) []*ltypes.GPTCompletionMessage {
+func MessagesToOpenAI(messages []*Message) []*ltypes.GPTCompletionMessage {
 	resp := make([]*ltypes.GPTCompletionMessage, 0)
 
 	for _, item := range messages {
-		var role string
-
+		message := &ltypes.GPTCompletionMessage{
+			Content: item.Message,
+		}
 		switch item.Role {
 		case RoleSystem:
-			role = "system"
+			message.Role = "system"
 		case RoleAI:
-			role = "assistant"
+			message.Role = "assistant"
+		case RoleToolCall:
+			message.Role = "assistant"
+			message.ToolCalls = item.GetToolCall().ToOpenAI()
+		case RoleToolResult:
+			message.Role = "tool"
+			message.ToolCallId = item.ToolUseID
+			message.Name = item.ToolName
 		default:
-			role = "user"
+			message.Role = "user"
 		}
 
-		resp = append(resp, &ltypes.GPTCompletionMessage{
-			Role:    role,
-			Content: item.Message,
-		})
+		resp = append(resp, message)
 	}
 
 	return resp
@@ -148,91 +222,72 @@ Parses a list of `GemContent` into a list of `LanguageModelMessage`. These metho
 be used over manual converstion to ensure correct serialization and message parsing from
 the implementation specific messaging system and the `LanguageModelMessage` abstraction.
 */
-func LLMMessagesFromGemini(messages []*ltypes.GemContent) []*LanguageModelMessage {
-	resp := make([]*LanguageModelMessage, 0)
+func MessagesFromGemini(messages []*ltypes.GemContent) []*Message {
+	resp := make([]*Message, 0)
 
 	// loop over messages and perform parsing
-	for _, item := range messages {
-
-		// check for system message
-		if strings.HasPrefix(item.Parts[0].Text, gemini_system_message) {
-			// split into two messages
-			parsed := strings.Split(item.Parts[0].Text, "\n\n")
-			// remove the system message from the first parsed message
-			sys := strings.ReplaceAll(parsed[0], fmt.Sprintf("%s: ", gemini_system_message), "")
-			// add the system message
-			resp = append(resp, NewSystemMessage(sys))
-			// add the user message
-			resp = append(resp, NewUserMessage(parsed[1]))
-		} else {
-			// basic message
-			msg := &LanguageModelMessage{
-				Message: item.Parts[0].Text,
+	for index, item := range messages {
+		switch item.Role {
+		case "system":
+			resp = append(resp, NewSystemMessage(item.Parts[0].Text))
+		case "model":
+			// parse a function call if there was one
+			if item.Parts[0].FunctionCall != nil {
+				resp = append(resp, NewToolCallMessage(uuid.New().String(), item.Parts[0].FunctionCall.Name, item.Parts[0].FunctionCall.Args, ""))
+			} else {
+				resp = append(resp, NewAssistantMessage(item.Parts[0].Text))
 			}
-			switch item.Role {
-			case "model":
-				msg.Role = RoleAI
-			default:
-				msg.Role = RoleUser
+		default:
+			if item.Parts[0].FunctionResponse != nil {
+				// parse the tool use id from the previous messages
+				toolUseId := resp[index-1].ToolUseID
+				resp = append(resp, NewToolResultMessage(toolUseId, item.Parts[0].FunctionResponse.Name, item.Parts[0].FunctionResponse.Response["function_response"].(string)))
+			} else {
+				resp = append(resp, NewUserMessage(item.Parts[0].Text))
 			}
-			resp = append(resp, msg)
 		}
 	}
 
 	return resp
 }
 
-func LLMMessagesToGemini(messages []*LanguageModelMessage) []*ltypes.GemContent {
+func MessagesToGemini(messages []*Message) []*ltypes.GemContent {
 	resp := make([]*ltypes.GemContent, 0)
 
 	for _, item := range messages {
-		var role string
-		message := item.Message
-
 		switch item.Role {
-		case RoleSystem:
-			// create a custom message as there is not a 'system' message in gemini
-			role = "user"
-			message = fmt.Sprintf("%s: %s", gemini_system_message, item.Message)
 		case RoleAI:
-			role = "model"
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "model",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
+			})
+		case RoleSystem:
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "system",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
+			})
+		case RoleToolCall:
+			resp = append(resp, &ltypes.GemContent{
+				Role: "model",
+				Parts: []ltypes.GemPart{{FunctionCall: &ltypes.GemFunctionCall{
+					Name: item.ToolName,
+					Args: item.ToolArguments,
+				}}},
+			})
+		case RoleToolResult:
+			resp = append(resp, &ltypes.GemContent{
+				Role: "user",
+				Parts: []ltypes.GemPart{{FunctionResponse: &ltypes.GemFunctionResponse{
+					Name: item.ToolName,
+					Response: map[string]any{
+						"function_response": item.Message,
+					},
+				}}},
+			})
 		default:
-			if len(resp) == 1 && messages[0].Role == RoleSystem {
-				// append to the first user message as there is no system message in gemini
-				resp[0].Parts[0].Text = fmt.Sprintf("%s\n\n%s", resp[0].Parts[0].Text, item.Message)
-				continue
-			} else {
-				role = "user"
-			}
-		}
-
-		// if got here, normal append
-		resp = append(resp, &ltypes.GemContent{
-			Role: role,
-			Parts: []ltypes.GemPart{
-				{
-					Text: message,
-				},
-			},
-		})
-	}
-
-	return resp
-}
-
-func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LanguageModelMessage {
-	resp := make([]*LanguageModelMessage, 0)
-
-	for _, item := range messages {
-		switch item.Role {
-		case "system":
-			resp = append(resp, NewSystemMessage(item.Content))
-		case "user":
-			resp = append(resp, NewUserMessage(item.Content))
-		case "assistant":
-			resp = append(resp, &LanguageModelMessage{
-				Role:    RoleAI,
-				Message: item.Content,
+			resp = append(resp, &ltypes.GemContent{
+				Role:  "user",
+				Parts: []ltypes.GemPart{{Text: item.Message}},
 			})
 		}
 	}
@@ -240,22 +295,118 @@ func LLMMessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*LanguageMo
 	return resp
 }
 
-func LLMMessagesToAnthropic(messages []*LanguageModelMessage) []*ltypes.AnthropicMessage {
+func MessagesFromAnthropic(messages []*ltypes.AnthropicMessage) []*Message {
+	resp := make([]*Message, 0)
+
+	for index, msg := range messages {
+		switch msg.Role {
+		case "system":
+			// system messages never use tools
+			resp = append(resp, NewSystemMessage(msg.Content[0].Text))
+		case "user":
+			// check if tool result
+			if msg.Content[0].Type == "tool_result" {
+				// get the toolId from the previous message in the list
+				toolName := ""
+				for _, item := range messages[index-1].Content {
+					if item.Type == "tool_use" {
+						toolName = item.Name
+					}
+				}
+
+				resp = append(resp, NewToolResultMessage(msg.Content[0].ToolUseID, toolName, msg.Content[0].Content))
+			} else {
+				// normal message
+				resp = append(resp, NewUserMessage(msg.Content[0].Text))
+			}
+		case "assistant":
+			// check for all possible options
+			var tmp *Message
+			for _, item := range msg.Content {
+				switch item.Type {
+				case "tool_use":
+					tmp = NewToolCallMessage(
+						item.ID,
+						item.Name,
+						item.Input,
+						"",
+					)
+				case "text":
+					tmp = NewAssistantMessage(item.Text)
+				}
+			}
+			resp = append(resp, tmp)
+		}
+	}
+
+	return resp
+}
+
+func MessagesToAnthropic(messages []*Message) []*ltypes.AnthropicMessage {
 	resp := make([]*ltypes.AnthropicMessage, 0)
 
-	for _, item := range messages {
-		msg := &ltypes.AnthropicMessage{
-			Content: item.Message,
-		}
-		switch item.Role {
+	for _, msg := range messages {
+		content := make([]*ltypes.AnthropicContent, 0)
+
+		switch msg.Role {
+		case RoleUser:
+			content = append(content, &ltypes.AnthropicContent{
+				Type: "text",
+				Text: msg.Message,
+			})
+			resp = append(resp, &ltypes.AnthropicMessage{
+				Role:    "user",
+				Content: content,
+			})
 		case RoleSystem:
-			msg.Role = "system"
+			// the system message is parsed from the message array during the request
+			// because Anthropic does not handle system messages the same way
+			content = append(content, &ltypes.AnthropicContent{
+				Type: "text",
+				Text: msg.Message,
+			})
+			resp = append(resp, &ltypes.AnthropicMessage{
+				Role:    "system",
+				Content: content,
+			})
 		case RoleAI:
-			msg.Role = "assistant"
-		default:
-			msg.Role = "user"
+			// initalize the array and seed as a text message
+			content = append(content, &ltypes.AnthropicContent{
+				Type: "text",
+				Text: msg.Message,
+			})
+			resp = append(resp, &ltypes.AnthropicMessage{
+				Role:    "assistant",
+				Content: content,
+			})
+		case RoleToolCall:
+			// create the ai message structure with a text message and a tool use message
+			content = append(content, &ltypes.AnthropicContent{
+				Type: "text",
+				Text: "thinking ...",
+			})
+			content = append(content, &ltypes.AnthropicContent{
+				Type:  "tool_use",
+				ID:    msg.ToolUseID,
+				Name:  msg.ToolName,
+				Input: msg.ToolArguments,
+			})
+			resp = append(resp, &ltypes.AnthropicMessage{
+				Role:    "assistant",
+				Content: content,
+			})
+		case RoleToolResult:
+			// add tool call results as user messages
+			content = append(content, &ltypes.AnthropicContent{
+				Type:      "tool_result",
+				ToolUseID: msg.ToolUseID,
+				Content:   msg.Message,
+			})
+			resp = append(resp, &ltypes.AnthropicMessage{
+				Role:    "user",
+				Content: content,
+			})
 		}
-		resp = append(resp, msg)
 	}
 
 	return resp
