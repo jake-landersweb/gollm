@@ -108,7 +108,7 @@ func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedRespo
 	}, nil
 }
 
-func (e *OpenAIEmbeddings) GetTokenRecords() []*tokens.UsageRecord {
+func (e *OpenAIEmbeddings) GetUsageRecords() []*tokens.UsageRecord {
 	return e.usageRecords
 }
 
