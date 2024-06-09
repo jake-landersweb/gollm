@@ -71,6 +71,8 @@ func (l *LanguageModel) anthropicCompletion(
 		}
 	}
 
+	debugPrint(comprequest)
+
 	// parse and encode the body
 	enc, err := json.Marshal(comprequest)
 	if err != nil {

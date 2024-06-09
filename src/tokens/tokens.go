@@ -5,7 +5,7 @@ import (
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
 )
 
-type TokenRecord struct {
+type UsageRecord struct {
 	ID           uuid.UUID // ID to ensure usage is not reported twice
 	Model        string    // for pricing calculations
 	InputTokens  int
@@ -13,9 +13,9 @@ type TokenRecord struct {
 	TotalTokens  int
 }
 
-func NewTokenRecord(model string, input int, output int, total int) *TokenRecord {
+func NewUsageRecord(model string, input int, output int, total int) *UsageRecord {
 	id, _ := uuid.NewV7()
-	return &TokenRecord{
+	return &UsageRecord{
 		ID:           id,
 		Model:        model,
 		InputTokens:  input,
@@ -24,9 +24,9 @@ func NewTokenRecord(model string, input int, output int, total int) *TokenRecord
 	}
 }
 
-func NewTokenRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *TokenRecord {
+func NewUsageRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *UsageRecord {
 	id, _ := uuid.NewV7()
-	return &TokenRecord{
+	return &UsageRecord{
 		ID:           id,
 		Model:        model,
 		InputTokens:  usage.PromptTokens,
@@ -35,9 +35,9 @@ func NewTokenRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *TokenReco
 	}
 }
 
-func NewTokenRecordFromAnthropicUsage(model string, usage *ltypes.AnthropicUsage) *TokenRecord {
+func NewUsageRecordFromAnthropicUsage(model string, usage *ltypes.AnthropicUsage) *UsageRecord {
 	id, _ := uuid.NewV7()
-	return &TokenRecord{
+	return &UsageRecord{
 		ID:           id,
 		Model:        model,
 		InputTokens:  usage.InputTokens,

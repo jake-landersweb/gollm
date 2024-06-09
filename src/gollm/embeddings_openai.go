@@ -22,6 +22,8 @@ type OpenAIEmbeddings struct {
 	userId string
 	logger *slog.Logger
 	opts   *OpenAIEmbeddingsOpts
+
+	usageRecords []*tokens.UsageRecord
 }
 
 // Optional configurations to customize the usage of the model.
@@ -73,7 +75,7 @@ func NewOpenAIEmbeddings(userId string, logger *slog.Logger, opts *OpenAIEmbeddi
 
 type EmbedResponse struct {
 	Embeddings []*ltypes.EmbeddingsData
-	Usage      *tokens.TokenRecord
+	Usage      *tokens.UsageRecord
 }
 
 func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedResponse, error) {
@@ -88,7 +90,8 @@ func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedRespo
 	}
 
 	// track token usage
-	tokenRecord := tokens.NewTokenRecordFromGPTUsage(e.opts.Model, &response.Usage)
+	usageRecord := tokens.NewUsageRecordFromGPTUsage(e.opts.Model, &response.Usage)
+	e.usageRecords = append(e.usageRecords, usageRecord)
 
 	// convert openai response into pgvector data types
 	list := make([]*ltypes.EmbeddingsData, 0)
@@ -101,8 +104,12 @@ func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedRespo
 
 	return &EmbedResponse{
 		Embeddings: list,
-		Usage:      tokenRecord,
+		Usage:      usageRecord,
 	}, nil
+}
+
+func (e *OpenAIEmbeddings) GetTokenRecords() []*tokens.UsageRecord {
+	return e.usageRecords
 }
 
 func (e *OpenAIEmbeddings) openAIEmbed(ctx context.Context, input []string) (*ltypes.OpenAIEmbeddingResponse, error) {

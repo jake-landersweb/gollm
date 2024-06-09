@@ -13,6 +13,9 @@ type LanguageModel struct {
 	userId string
 	logger *slog.Logger
 	args   *NewLanguageModelArgs
+
+	// store token records internally incase users want to store state inside the record
+	usageRecords []*tokens.UsageRecord
 }
 
 type CompletionInput struct {
@@ -22,7 +25,6 @@ type CompletionInput struct {
 	JsonSchema   string
 	Conversation []*Message
 	Tools        []*Tool
-	// Tools []
 }
 
 // Valiate the completion input
@@ -46,7 +48,7 @@ type CompletionResponse struct {
 	Model       string
 	StopReason  string
 	Message     *Message
-	UsageRecord *tokens.TokenRecord
+	UsageRecord *tokens.UsageRecord
 }
 
 type NewLanguageModelArgs struct {
@@ -100,9 +102,10 @@ func NewLanguageModel(
 	args = parseArguments(args)
 
 	return &LanguageModel{
-		userId: userId,
-		logger: logger,
-		args:   args,
+		userId:       userId,
+		logger:       logger,
+		args:         args,
+		usageRecords: make([]*tokens.UsageRecord, 0),
 	}
 }
 
@@ -145,15 +148,26 @@ func (l *LanguageModel) Completion(ctx context.Context, input *CompletionInput) 
 	// check the token usage and trim the conversation if needed
 	// TODO --
 
+	var response *CompletionResponse
+	var err error
+
 	if strings.HasPrefix(input.Model, "gpt") {
-		return l.gpt(ctx, input, conversation)
+		response, err = l.gpt(ctx, input, conversation)
 	} else if strings.HasPrefix(input.Model, "gemini") {
-		return l.gemini(ctx, input, conversation)
+		response, err = l.gemini(ctx, input, conversation)
 	} else if strings.HasPrefix(input.Model, "claude") {
-		return l.anthropic(ctx, input, conversation)
+		response, err = l.anthropic(ctx, input, conversation)
 	} else {
 		return nil, fmt.Errorf("invalid model type: %s", input.Model)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	// store the token record internally as well
+	l.usageRecords = append(l.usageRecords, response.UsageRecord)
+	return response, nil
 }
 
 // Perform a completion specifically using OpenAI as the provider.
@@ -182,7 +196,7 @@ func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, convers
 	choice := &response.Choices[0]
 
 	// Create a token record for this request
-	tokenRecord := tokens.NewTokenRecordFromGPTUsage(input.Model, &response.Usage)
+	tokenRecord := tokens.NewUsageRecordFromGPTUsage(input.Model, &response.Usage)
 
 	logger.InfoContext(ctx, "Completed GPT completion")
 	logger.DebugContext(ctx, "GPT completion stats", "response", response, "inTokens", response.Usage.PromptTokens, "outTokens", response.Usage.CompletionTokens, "totalTokens", response.Usage.TotalTokens)
@@ -235,7 +249,7 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 	candidate := &response.Candidates[0]
 
 	// add the parsed tokens
-	tokenRecord := tokens.NewTokenRecord(input.Model, inTokens, outTokens, inTokens+outTokens)
+	tokenRecord := tokens.NewUsageRecord(input.Model, inTokens, outTokens, inTokens+outTokens)
 
 	logger.InfoContext(ctx, "Completed Gemini completion")
 	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
@@ -270,7 +284,7 @@ func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, c
 	}
 
 	// add the tokens to the internal counts
-	tokenRecord := tokens.NewTokenRecordFromAnthropicUsage(input.Model, response.Usage)
+	tokenRecord := tokens.NewUsageRecordFromAnthropicUsage(input.Model, response.Usage)
 
 	logger.InfoContext(ctx, "Completed Anthropic completion")
 	logger.DebugContext(ctx, "Anthropic completion stats", "response", response, "inTokens", response.Usage.InputTokens, "outTokens", response.Usage.OutputTokens, "totalTokens", response.Usage.InputTokens+response.Usage.OutputTokens)
@@ -311,4 +325,8 @@ func PrintConversation(conversation []*Message) {
 		}
 		fmt.Println("")
 	}
+}
+
+func (l *LanguageModel) GetUsageRecords() []*tokens.UsageRecord {
+	return l.usageRecords
 }
