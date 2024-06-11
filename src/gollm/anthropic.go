@@ -25,6 +25,8 @@ func (l *LanguageModel) anthropicCompletion(
 	jsonSchema string,
 	messages []*ltypes.AnthropicMessage,
 	tools []*ltypes.AnthropicTool,
+	prohibitTool bool,
+	toolChoice string,
 ) (*ltypes.AnthropicResponse, error) {
 	apiKey := l.args.AnthropicApiKey
 	if apiKey == "" {
@@ -52,6 +54,13 @@ func (l *LanguageModel) anthropicCompletion(
 		MaxTokens:   l.args.AnthropicMaxTokens,
 		Temperature: temperature,
 		Tools:       tools,
+	}
+
+	if !prohibitTool && toolChoice != "" {
+		comprequest.ToolChoice = &ltypes.AnthropicToolChoice{
+			Type: "tool",
+			Name: toolChoice,
+		}
 	}
 
 	// do not add any extra options for tool use

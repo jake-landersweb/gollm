@@ -129,7 +129,7 @@ func TestLLMMulti(t *testing.T) {
 }
 
 func TestLLMToolUse(t *testing.T) {
-	logger := defaultLogger(slog.LevelDebug).With("test", "TestGPTToolUsage")
+	logger := defaultLogger(slog.LevelDebug).With("test", "TestLLMToolUse")
 	tools := make([]*Tool, 0)
 	tools = append(tools, &Tool{
 		Title:       "get_weather",
@@ -150,6 +150,7 @@ func TestLLMToolUse(t *testing.T) {
 
 	// function to get seeded message array
 	runCombo := func(model1 string, model2 string) {
+		fmt.Printf("MODEL 1: %s\nMODEL 2: %s\n", model1, model2)
 		messages := make([]*Message, 0)
 		messages = append(messages, NewSystemMessage("You are a model in a testing environment to test the implementation of tool use for language models. Act as normal."))
 		messages = append(messages, NewUserMessage("What is the weather in San Francisco today?"))
@@ -160,6 +161,7 @@ func TestLLMToolUse(t *testing.T) {
 			Temperature:  0.5,
 			Conversation: messages,
 			Tools:        tools,
+			RequiredTool: tools[0],
 		})
 		require.NoError(t, err)
 		messages = append(messages, response.Message)
@@ -179,7 +181,7 @@ func TestLLMToolUse(t *testing.T) {
 		messages = append(messages, response.Message)
 		require.Equal(t, RoleAI, messages[len(messages)-1].Role)
 
-		fmt.Printf("MODEL 1: %s\nMODEL 2:%s\n", model1, model2)
+		fmt.Printf("MODEL 1: %s\nMODEL 2: %s\n", model1, model2)
 		PrintConversation(messages)
 	}
 

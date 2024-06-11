@@ -27,6 +27,8 @@ func (l *LanguageModel) gptCompletion(
 	jsonSchema string,
 	messages []*ltypes.GPTCompletionMessage,
 	tools []*ltypes.GPTTool,
+	prohibitTool bool,
+	toolChoice string,
 ) (*ltypes.GPTCompletionResponse, error) {
 	apiKey := l.args.OpenAIApiKey
 	if apiKey == "" {
@@ -49,6 +51,18 @@ func (l *LanguageModel) gptCompletion(
 	// add the tools if necessary
 	if tools != nil {
 		comprequest.Tools = tools
+		if !prohibitTool && toolChoice != "" {
+			comprequest.ToolChoice = &ltypes.GPTToolChoice{
+				Type: "function",
+				Function: &ltypes.GPTToolChoiceFunction{
+					Name: toolChoice,
+				},
+			}
+		} else if prohibitTool {
+			comprequest.ToolChoice = &ltypes.GPTToolChoice{
+				Type: "none",
+			}
+		}
 	}
 
 	if jsonMode {

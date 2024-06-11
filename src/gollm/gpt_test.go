@@ -24,7 +24,7 @@ func TestGPTTextCompletion(t *testing.T) {
 	})
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", messages, nil)
+	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", messages, nil, false, "")
 	require.Nil(t, err)
 
 	require.NotEmpty(t, response.Choices)
@@ -49,7 +49,7 @@ func TestGPTJSONCompletion(t *testing.T) {
 	})
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, true, schema, messages, nil)
+	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, true, schema, messages, nil, false, "")
 	require.Nil(t, err)
 
 	require.NotEmpty(t, response.Choices)
@@ -100,7 +100,7 @@ func TestGPTToolUsage(t *testing.T) {
 	messages = append(messages, NewUserMessage("What is the weather in San Francisco today?"))
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", MessagesToOpenAI(messages), ToolsToOpenAI(tools))
+	response, err := llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", MessagesToOpenAI(messages), ToolsToOpenAI(tools), true, tools[0].Title)
 	require.Nil(t, err)
 
 	enc, _ = json.MarshalIndent(response, "", "    ")
@@ -113,7 +113,7 @@ func TestGPTToolUsage(t *testing.T) {
 	// add a tool use result onto the message
 	messages = append(messages, NewToolResultMessage(latestMessage.ToolUseID, latestMessage.ToolName, "35 degrees"))
 
-	response, err = llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", MessagesToOpenAI(messages), ToolsToOpenAI(tools))
+	response, err = llm.gptCompletion(context.TODO(), logger, test_user_id, gpt3_model, 1.0, false, "", MessagesToOpenAI(messages), ToolsToOpenAI(tools), false, "")
 	require.NoError(t, err)
 
 	enc, _ = json.MarshalIndent(response, "", "    ")
