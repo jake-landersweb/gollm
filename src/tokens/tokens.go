@@ -35,6 +35,17 @@ func NewUsageRecordFromGPTUsage(model string, usage *ltypes.GPTUsage) *UsageReco
 	}
 }
 
+func NewUsageRecordFromGeminiUsage(model string, usage *ltypes.GemUsageMetadata) *UsageRecord {
+	id, _ := uuid.NewV7()
+	return &UsageRecord{
+		ID:           id,
+		Model:        model,
+		InputTokens:  usage.PromptTokenCount,
+		OutputTokens: usage.CandidatesTokenCount,
+		TotalTokens:  usage.TotalTokenCount,
+	}
+}
+
 func NewUsageRecordFromAnthropicUsage(model string, usage *ltypes.AnthropicUsage) *UsageRecord {
 	id, _ := uuid.NewV7()
 	return &UsageRecord{

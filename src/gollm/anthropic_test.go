@@ -23,7 +23,7 @@ func TestAnthropicTextCompletion(t *testing.T) {
 	messages := MessagesToAnthropic(raw)
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, false, "", messages, nil)
+	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, false, "", messages, nil, false, "")
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -47,7 +47,7 @@ func TestAnthropicJSONCompletion(t *testing.T) {
 	fmt.Println(*messages[0])
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, true, schema, messages, nil)
+	response, err := llm.anthropicCompletion(ctx, logger, anthropic_claude3, 0.5, true, schema, messages, nil, false, "")
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -99,7 +99,7 @@ func TestAnthropicToolUse(t *testing.T) {
 
 	// send the tool use request
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.anthropicCompletion(context.TODO(), logger, anthropic_claude3, 0.5, false, "", MessagesToAnthropic(messages), ToolsToAnthropic(tools))
+	response, err := llm.anthropicCompletion(context.TODO(), logger, anthropic_claude3, 0.5, false, "", MessagesToAnthropic(messages), ToolsToAnthropic(tools), true, tools[0].Title)
 	require.NoError(t, err)
 
 	debugPrint(response)
@@ -119,7 +119,7 @@ func TestAnthropicToolUse(t *testing.T) {
 	fmt.Println("INPUT ANTH MESSAGES:")
 	anthMsg := MessagesToAnthropic(messages)
 	debugPrint(anthMsg)
-	response, err = llm.anthropicCompletion(context.TODO(), logger, anthropic_claude3, 0.5, false, "", anthMsg, ToolsToAnthropic(tools))
+	response, err = llm.anthropicCompletion(context.TODO(), logger, anthropic_claude3, 0.5, false, "", anthMsg, ToolsToAnthropic(tools), false, "")
 	require.NoError(t, err)
 
 	// ensure the response was a valid assistant message

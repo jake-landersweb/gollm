@@ -14,8 +14,17 @@ type GPTCompletionRequest struct {
 	Stream           bool                    `json:"stream,omitempty"`           // If set, partial message deltas will be sent, like in ChatGPT. Tokens will be sent as data-only server-sent events as they become available, with the stream terminated by a data: [DONE] message.
 	Temperature      float64                 `json:"temperature,omitempty"`      // What sampling temperature to use, between 0 and 2. Higher values like 0.8 will make the output more random, while lower values like 0.2 will make it more focused and deterministic.
 	Tools            []*GPTTool              `json:"tools,omitempty"`            // A list of tools the model may call. Currently, only functions are supported as a tool. Use this to provide a list of functions the model may generate JSON inputs for.
-	ToolChoice       string                  `json:"tool_choice,omitempty"`      // Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function
+	ToolChoice       *GPTToolChoice          `json:"tool_choice,omitempty"`      // Controls which (if any) function is called by the model. none means the model will not call a function and instead generates a message. auto means the model can pick between generating a message or calling a function
 	User             string                  `json:"user,omitempty"`             // A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse.
+}
+
+type GPTToolChoice struct {
+	Type     string                 `json:"type"`
+	Function *GPTToolChoiceFunction `json:"function,omitempty"`
+}
+
+type GPTToolChoiceFunction struct {
+	Name string `json:"name"`
 }
 
 type GPTRespFormat struct {

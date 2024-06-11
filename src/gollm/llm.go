@@ -25,6 +25,8 @@ type CompletionInput struct {
 	JsonSchema   string
 	Conversation []*Message
 	Tools        []*Tool
+	RequiredTool *Tool
+	ProhibitTool bool // if set to true, will not use tools
 }
 
 // Valiate the completion input
@@ -176,6 +178,11 @@ func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, convers
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning GPT completion ...")
 
+	requiredTool := ""
+	if input.RequiredTool != nil {
+		requiredTool = input.RequiredTool.Title
+	}
+
 	// send the request
 	response, err := l.gptCompletion(
 		ctx,
@@ -187,6 +194,8 @@ func (l *LanguageModel) gpt(ctx context.Context, input *CompletionInput, convers
 		input.JsonSchema,
 		MessagesToOpenAI(conversation),
 		ToolsToOpenAI(input.Tools),
+		input.ProhibitTool,
+		requiredTool,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
@@ -216,12 +225,10 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning Gemini completion ...")
 
-	logger.DebugContext(ctx, "Calculating the input tokens ...")
-	inTokens, err := geminiTokenizerAccurate(conversation[len(conversation)-1].Message, input.Model)
-	if err != nil {
-		return nil, fmt.Errorf("there was an issue calculating the token usage: %v", err)
+	requiredTool := ""
+	if input.RequiredTool != nil {
+		requiredTool = input.RequiredTool.Title
 	}
-	logger.DebugContext(ctx, "Got input tokens", "tokens", inTokens)
 
 	// send the request
 	response, err := l.geminiCompletion(
@@ -233,26 +240,21 @@ func (l *LanguageModel) gemini(ctx context.Context, input *CompletionInput, conv
 		input.JsonSchema,
 		MessagesToGemini(conversation),
 		ToolsToGemini(input.Tools),
+		input.ProhibitTool,
+		requiredTool,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)
 	}
 
-	logger.DebugContext(ctx, "Calculating the output tokens ...")
-	outTokens, err := geminiTokenizerAccurate(response.Candidates[0].Content.Parts[0].Text, input.Model)
-	if err != nil {
-		return nil, fmt.Errorf("there was an issue calculating the token usage for this api call: %v", err)
-	}
-	logger.DebugContext(ctx, "Got output tokens", "tokens", outTokens)
-
 	// add the conversation record
 	candidate := &response.Candidates[0]
 
-	// add the parsed tokens
-	tokenRecord := tokens.NewUsageRecord(input.Model, inTokens, outTokens, inTokens+outTokens)
+	// parse token usage from the response
+	tokenRecord := tokens.NewUsageRecordFromGeminiUsage(input.Model, response.UsageMetadata)
 
 	logger.InfoContext(ctx, "Completed Gemini completion")
-	logger.DebugContext(ctx, "Gemini completion stats", "response", response, "inTokens", inTokens, "outTokens", outTokens, "totalTokens", inTokens+outTokens)
+	logger.DebugContext(ctx, "Gemini completion stats", "record", *tokenRecord)
 
 	return &CompletionResponse{
 		Model:       input.Model,
@@ -268,6 +270,11 @@ func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, c
 	logger := l.logger.With("model", input.Model, "temperature", input.Temperature, "json", input.Json, "jsonSchema", input.JsonSchema)
 	logger.InfoContext(ctx, "Beginning Anthropic completion ...")
 
+	requiredTool := ""
+	if input.RequiredTool != nil {
+		requiredTool = input.RequiredTool.Title
+	}
+
 	// send the request
 	response, err := l.anthropicCompletion(
 		ctx,
@@ -278,6 +285,8 @@ func (l *LanguageModel) anthropic(ctx context.Context, input *CompletionInput, c
 		input.JsonSchema,
 		MessagesToAnthropic(conversation),
 		ToolsToAnthropic(input.Tools),
+		input.ProhibitTool,
+		requiredTool,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("there was an issue sending the request: %v", err)

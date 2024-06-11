@@ -24,6 +24,8 @@ func (l *LanguageModel) geminiCompletion(
 	jsonSchema string,
 	messages []*ltypes.GemContent,
 	tools []*ltypes.GemTool,
+	prohibitTool bool,
+	toolChoice string,
 ) (*ltypes.GemCompletionResponse, error) {
 	apiKey := l.args.GeminiApiKey
 	if apiKey == "" {
@@ -73,6 +75,22 @@ func (l *LanguageModel) geminiCompletion(
 	// add tools if applicable
 	if tools != nil {
 		comprequest.Tools = tools
+
+		// force the tool choice
+		if !prohibitTool && toolChoice != "" {
+			comprequest.ToolConfig = &ltypes.GemToolConfig{
+				FunctionCallingConfig: &ltypes.FunctionCallingConfig{
+					Mode:                 "ANY",
+					AllowedFunctionNames: []string{toolChoice},
+				},
+			}
+		} else if prohibitTool {
+			comprequest.ToolConfig = &ltypes.GemToolConfig{
+				FunctionCallingConfig: &ltypes.FunctionCallingConfig{
+					Mode: "NONE",
+				},
+			}
+		}
 	}
 
 	// parse for json mode
@@ -121,7 +139,6 @@ func (l *LanguageModel) geminiCompletion(
 		}
 
 		logger.InfoContext(ctx, "Completed request", "statusCode", resp.StatusCode)
-		logger.DebugContext(ctx, "Response body", "body", string(body))
 
 		// parse the request body
 		var response ltypes.GemCompletionResponse

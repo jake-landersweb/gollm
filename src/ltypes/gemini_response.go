@@ -1,9 +1,16 @@
 package ltypes
 
 type GemCompletionResponse struct {
-	Candidates     []GemCandidate    `json:"candidates"`
-	PromptFeedback GemPromptFeedback `json:"promptFeedback"`
-	Error          *GemError         `json:"error"`
+	Candidates     []GemCandidate     `json:"candidates"`
+	PromptFeedback *GemPromptFeedback `json:"promptFeedback"`
+	Error          *GemError          `json:"error"`
+	UsageMetadata  *GemUsageMetadata  `json:"usageMetadata"`
+}
+
+type GemUsageMetadata struct {
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	PromptTokenCount     int `json:"promptTokenCount"`
+	TotalTokenCount      int `json:"totalTokenCount"`
 }
 
 type GemCandidate struct {

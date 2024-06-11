@@ -33,7 +33,7 @@ func TestGeminiTextCompletion(t *testing.T) {
 	messages := MessagesToGemini(raw)
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, false, "", messages, nil)
+	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, false, "", messages, nil, false, "")
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -57,7 +57,7 @@ func TestGeminiJSONCompletion(t *testing.T) {
 	fmt.Println(*messages[0])
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, true, schema, messages, nil)
+	response, err := llm.geminiCompletion(ctx, logger, gemini_model, 0.5, true, schema, messages, nil, false, "")
 	assert.Nil(t, err)
 	if err != nil {
 		return
@@ -105,7 +105,7 @@ func TestGeminiToolUse(t *testing.T) {
 	debugPrint(MessagesToGemini(messages))
 
 	llm := NewLanguageModel(test_user_id, logger, nil)
-	response, err := llm.geminiCompletion(context.TODO(), logger, gemini_model, 0.5, false, "", MessagesToGemini(messages), ToolsToGemini(tools))
+	response, err := llm.geminiCompletion(context.TODO(), logger, gemini_model, 0.5, false, "", MessagesToGemini(messages), ToolsToGemini(tools), true, tools[0].Title)
 	require.Nil(t, err)
 	fmt.Println("Gem Response:")
 	debugPrint(response)
@@ -122,7 +122,7 @@ func TestGeminiToolUse(t *testing.T) {
 	debugPrint(MessagesToGemini(messages))
 
 	// create a new completion
-	response, err = llm.geminiCompletion(context.TODO(), logger, gemini_model, 0.5, false, "", MessagesToGemini(messages), ToolsToGemini(tools))
+	response, err = llm.geminiCompletion(context.TODO(), logger, gemini_model, 0.5, false, "", MessagesToGemini(messages), ToolsToGemini(tools), false, "")
 	require.NoError(t, err)
 	fmt.Println("Gem Response:")
 	debugPrint(response)
