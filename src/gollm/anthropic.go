@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jake-landersweb/gollm/v2/src/ltypes"
@@ -32,7 +33,7 @@ func (l *LanguageModel) anthropicCompletion(
 	if apiKey == "" {
 		apiKey = os.Getenv("ANTHROPIC_API_KEY")
 		if apiKey == "" || apiKey == "null" {
-			return nil, fmt.Errorf("the environment variable `GEMINI_API_KEY` is required")
+			return nil, fmt.Errorf("the environment variable `ANTHROPIC_API_KEY` is required")
 		}
 	}
 
@@ -40,7 +41,7 @@ func (l *LanguageModel) anthropicCompletion(
 	var msgs []*ltypes.AnthropicMessage
 	systemMsg := ""
 	if messages[0].Role == "system" {
-		systemMsg = messages[0].Content[0].Text
+		systemMsg = fmt.Sprintf("%s\n\nFormatting Instructions:\nYou MUST place your response to this message inside <response></response> XML tags. Any context or extra information shall be placed outside these tags, with the <response> XML tag containing exactly what was requested.", messages[0].Content[0].Text)
 		msgs = messages[1:] // trim off the first message
 	} else {
 		msgs = messages
@@ -60,23 +61,6 @@ func (l *LanguageModel) anthropicCompletion(
 		comprequest.ToolChoice = &ltypes.AnthropicToolChoice{
 			Type: "tool",
 			Name: toolChoice,
-		}
-	}
-
-	// do not add any extra options for tool use
-	if messages[len(messages)-1].Content[0].Type != "tool_result" {
-		// add instructions for json mode
-		if jsonMode {
-			if jsonSchema == "" {
-				return nil, fmt.Errorf("invalid json schema provided")
-			}
-
-			logger.DebugContext(ctx, "Running with json mode ENABLED")
-
-			// add json instructions onto the end of the request
-			comprequest.Messages[len(comprequest.Messages)-1].Content[0].Text = fmt.Sprintf("%s\n\nPlease place your JSON output inside <json></json> xml tags, following this schema: %s", comprequest.Messages[len(comprequest.Messages)-1].Content[0].Text, jsonSchema)
-		} else {
-			logger.DebugContext(ctx, "Running with json mode DISABLED")
 		}
 	}
 
@@ -127,11 +111,11 @@ func (l *LanguageModel) anthropicCompletion(
 		// if no error, return
 		if response.Error == nil {
 			// if there are function calls, do not parse the response
-			if len(response.Content) > 1 || !jsonMode {
+			if len(response.Content) > 1 {
 				return &response, nil
 			}
 
-			logger.DebugContext(ctx, "Parsing json ...")
+			logger.DebugContext(ctx, "Parsing the AI message result")
 
 			// parse the xml response
 			response.Content[0].Text = fmt.Sprintf("<root>%s</root>", response.Content[0].Text)
@@ -140,14 +124,16 @@ func (l *LanguageModel) anthropicCompletion(
 			}
 
 			type root struct {
-				Json rtag `xml:"json"`
+				Response rtag `xml:"response"`
 			}
 
 			var tmp root
 			if err := xml.Unmarshal([]byte(response.Content[0].Text), &tmp); err != nil {
 				return nil, fmt.Errorf("failed to parse the xml: %s", err)
 			}
-			response.Content[0].Text = tmp.Json.Content
+			if strings.Trim(tmp.Response.Content, "") != "" {
+				response.Content[0].Text = tmp.Response.Content
+			}
 			return &response, nil
 		}
 

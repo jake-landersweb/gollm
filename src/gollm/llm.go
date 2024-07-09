@@ -167,6 +167,9 @@ func (l *LanguageModel) Completion(ctx context.Context, input *CompletionInput) 
 		return nil, err
 	}
 
+	// trim the leading and trailing whitespaces, if any, from the message
+	response.Message.Message = strings.TrimSpace(response.Message.Message)
+
 	// store the token record internally as well
 	l.usageRecords = append(l.usageRecords, response.UsageRecord)
 	return response, nil
