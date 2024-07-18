@@ -20,7 +20,6 @@ import (
 // Struct to handle the creation lifecycle when using OpenAI Embeddings
 type OpenAIEmbeddings struct {
 	userId string
-	logger *slog.Logger
 	opts   *OpenAIEmbeddingsOpts
 
 	usageRecords []*tokens.UsageRecord
@@ -30,31 +29,19 @@ type OpenAIEmbeddings struct {
 // This struct can be passed in as nil, and reasonable and functional defaults will be used.
 type OpenAIEmbeddingsOpts struct {
 	Model                ModelOpenAIEmbeddings
-	ChunkLength          int
 	EmbeddingsDimentions int
 	BaseUrl              string
-
-	// Function to use when splitting the text into sections that will fit into the context window.
-	// If null, the text will be split into equal-sized sections. `s` is the raw string, `n` is the max
-	// length the chunks can be. Must return a list of strings that where each len(string) <= n
-	ChunkingFunction func(s string, n int) []string
 
 	// Optionally pass in an api key. If not specified, the environment variable `OPENAI_API_KEY` will be read.
 	OpenAIApiKey string
 }
 
-func NewOpenAIEmbeddings(userId string, logger *slog.Logger, opts *OpenAIEmbeddingsOpts) *OpenAIEmbeddings {
-	if logger == nil {
-		logger = defaultLogger(slog.LevelInfo)
-	}
+func NewOpenAIEmbeddings(userId string, opts *OpenAIEmbeddingsOpts) *OpenAIEmbeddings {
 	if opts == nil {
 		opts = &OpenAIEmbeddingsOpts{}
 	}
 	if opts.Model == "" {
 		opts.Model = OPENAI_EMBEDDINGS_MODEL
-	}
-	if opts.ChunkLength == 0 {
-		opts.ChunkLength = openai_embeddings_chunk_size_default
 	}
 	if opts.EmbeddingsDimentions == 0 {
 		opts.EmbeddingsDimentions = openai_embeddings_dimensions
@@ -62,13 +49,9 @@ func NewOpenAIEmbeddings(userId string, logger *slog.Logger, opts *OpenAIEmbeddi
 	if opts.BaseUrl == "" {
 		opts.BaseUrl = openai_embeddings_base_url
 	}
-	if opts.ChunkingFunction == nil {
-		opts.ChunkingFunction = ChunkStringEqualUntilN
-	}
 
 	return &OpenAIEmbeddings{
 		userId: userId,
-		logger: logger.With("userId", userId, "model", opts.Model),
 		opts:   opts,
 	}
 }
@@ -78,13 +61,26 @@ type EmbedResponse struct {
 	Usage      *tokens.UsageRecord
 }
 
-func (e *OpenAIEmbeddings) Embed(ctx context.Context, input string) (*EmbedResponse, error) {
+func (e *OpenAIEmbeddings) Embed(
+	ctx context.Context,
+	logger *slog.Logger,
+	args *EmbedArgs,
+) (*EmbedResponse, error) {
 	// chunk the input
-	if input == "" {
-		return nil, fmt.Errorf("the input cannot be empty")
+	if err := args.IsValid(); err != nil {
+		return nil, fmt.Errorf("invalid arguments: %s", err)
 	}
-	chunks := e.opts.ChunkingFunction(input, e.opts.ChunkLength)
-	response, err := e.openAIEmbed(ctx, chunks)
+
+	var err error
+	chunks := args.InputChunks
+	if len(chunks) == 0 {
+		chunks, err = args.ChunkingFunction(args.Input)
+		if err != nil {
+			return nil, fmt.Errorf("failed to chunk the content: %s", err)
+		}
+	}
+
+	response, err := e.openAIEmbed(ctx, logger, chunks)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +108,11 @@ func (e *OpenAIEmbeddings) GetUsageRecords() []*tokens.UsageRecord {
 	return e.usageRecords
 }
 
-func (e *OpenAIEmbeddings) openAIEmbed(ctx context.Context, input []string) (*ltypes.OpenAIEmbeddingResponse, error) {
-	logger := e.logger.With()
-
+func (e *OpenAIEmbeddings) openAIEmbed(
+	ctx context.Context,
+	logger *slog.Logger,
+	input []string,
+) (*ltypes.OpenAIEmbeddingResponse, error) {
 	apiKey := e.opts.OpenAIApiKey
 	if apiKey == "" {
 		logger.DebugContext(ctx, "Reading api key from the environment")

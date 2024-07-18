@@ -15,13 +15,13 @@ func defaultLogger(level slog.Leveler) *slog.Logger {
 
 // Chunks string `s` into a list if strings into equal lengths with a max size of `n`
 // If the string is not divisible by n, then the items will be as close in length as possible
-func ChunkStringEqualUntilN(s string, n int) []string {
-	if len(s) == 0 || n <= 0 {
-		return []string{}
+func ChunkStringEqualUntilN(s string) ([]string, error) {
+	if len(s) == 0 {
+		return nil, fmt.Errorf("the input was empty")
 	}
 
 	totalRuneCount := utf8.RuneCountInString(s) // Count of runes instead of bytes
-	numParts := int(math.Ceil(float64(totalRuneCount) / float64(n)))
+	numParts := int(math.Ceil(float64(totalRuneCount) / float64(embeddings_chunk_size_default)))
 	evenLength := totalRuneCount / numParts
 	extraChars := totalRuneCount % numParts
 
@@ -42,10 +42,10 @@ func ChunkStringEqualUntilN(s string, n int) []string {
 		}
 
 		parts = append(parts, s[start:end])
-		start = end
+		start = end - embeddings_chunk_overlap_default
 	}
 
-	return parts
+	return parts, nil
 }
 
 // Converts a slice of one numeric type to another numeric type using generics.

@@ -18,7 +18,8 @@ const anthropic_max_tokens = 4096
 
 const openai_embeddings_base_url = "https://api.openai.com/v1/embeddings"
 const openai_embeddings_dimensions = 512
-const openai_embeddings_chunk_size_default = 512
+const embeddings_chunk_size_default = 1024
+const embeddings_chunk_overlap_default = 200
 const OPENAI_EMBEDDINGS_INPUT_MAX = 8191
 
 type ModelOpenAIEmbeddings = string

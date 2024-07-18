@@ -14,8 +14,10 @@ func TestOpenAIEmbeddings(t *testing.T) {
 	input := "Hello world, this is a string that I am going to convert into an embedding!"
 
 	// send the embeddings request
-	embeddings := NewOpenAIEmbeddings(test_user_id, logger, nil)
-	response, err := embeddings.Embed(ctx, input)
+	embeddings := NewOpenAIEmbeddings(test_user_id, nil)
+	response, err := embeddings.Embed(ctx, logger, &EmbedArgs{
+		Input: input,
+	})
 	require.Nil(t, err)
 
 	require.Equal(t, 1, len(response.Embeddings))
