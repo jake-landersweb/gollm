@@ -118,6 +118,7 @@ func (l *LanguageModel) anthropicCompletion(
 			logger.DebugContext(ctx, "Parsing the AI message result")
 
 			// parse the xml response
+			tmpContent := response.Content[0].Text
 			response.Content[0].Text = fmt.Sprintf("<root>%s</root>", response.Content[0].Text)
 			type rtag struct {
 				Content string `xml:",innerxml"`
@@ -129,10 +130,15 @@ func (l *LanguageModel) anthropicCompletion(
 
 			var tmp root
 			if err := xml.Unmarshal([]byte(response.Content[0].Text), &tmp); err != nil {
-				return nil, fmt.Errorf("failed to parse the xml: %s", err)
-			}
-			if strings.Trim(tmp.Response.Content, "") != "" {
-				response.Content[0].Text = tmp.Response.Content
+				logger.Warn("failed to parse the xml, using the raw content", "error", err)
+				response.Content[0].Text = tmpContent
+			} else {
+				if strings.Trim(tmp.Response.Content, "") != "" {
+					response.Content[0].Text = tmp.Response.Content
+				} else {
+					logger.Warn("there was an issue parsing the xml, using the raw response")
+					response.Content[0].Text = tmpContent
+				}
 			}
 			return &response, nil
 		}
